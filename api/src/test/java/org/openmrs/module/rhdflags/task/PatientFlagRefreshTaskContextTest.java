@@ -161,6 +161,22 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 	}
 
 	@Test
+	public void keepsItsNameWhenTheListInItsWayIsStuckBehindAHandMadeOne() {
+		saveHandMadeList("lost to follow-up", OTHER_PATIENT);
+		Flag first = saveFlag("overdue", MATCHES_ONE);
+		Flag second = saveFlag("follow-up due", MATCHES_ONE);
+		runScheduledWork();
+
+		rename(second, "lost to follow-up");
+		rename(first, "follow-up due");
+		runScheduledWork();
+		runScheduledWork();
+
+		assertEquals(1, listsNamed("overdue"));
+		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
+	}
+
+	@Test
 	public void leavesAHandMadeListWithTheFlagsNameAlone() {
 		saveHandMadeList("overdue", OTHER_PATIENT);
 		saveFlag("overdue", MATCHES_ONE);
