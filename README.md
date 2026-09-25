@@ -38,11 +38,10 @@ no list until one of the two is renamed). A rename onto such a name keeps the li
 flags swap or rotate names, one list steps aside to a temporary name so the others can move: a two-
 flag swap settles within two runs, and a longer rotation takes more. A flag that is disabled,
 retired or no longer tagged keeps its list with every membership ended. A list someone voided stays
-voided. Membership comes from the flags already evaluated rather than from re-running the criteria,
-so a list and the patient chart never disagree.
+voided. Membership comes from the live flag rows rather than from re-running the criteria.
 
-Removal end-dates a membership rather than voiding it. The cohort module counts a voided row when
-it rejects a duplicate, so a voided member could never rejoin the list.
+Removal end-dates a membership rather than voiding it. The cohort module's REST resource counts a
+voided row when it rejects a duplicate, so a voided member could not be added back through it.
 
 The task registers itself with the scheduler on first start, because Initializer has no domain for
 `scheduler_task_config`.

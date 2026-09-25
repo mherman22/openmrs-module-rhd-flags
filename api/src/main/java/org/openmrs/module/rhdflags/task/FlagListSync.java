@@ -26,8 +26,8 @@ import org.slf4j.LoggerFactory;
  * Mirrors each patient flag into a patient list of the same name.
  *
  * Cohort membership is static and nothing recomputes it, so a list only keeps matching its flag
- * if something keeps the two in step. Membership is taken from the flags the module has already
- * evaluated rather than from the criteria, so a list and the patient chart never disagree.
+ * if something keeps the two in step. Membership is taken from the live flag rows rather than
+ * from the criteria.
  *
  * A list shares its flag's uuid, so it follows the flag through a rename and a cohort someone
  * made by hand under the same name is never touched. A flag that is disabled, retired or missing
@@ -119,8 +119,8 @@ public class FlagListSync {
 			}
 		}
 
-		// End-dating rather than voiding: the module counts a voided row when it rejects a
-		// duplicate, so a voided member could never rejoin the list.
+		// End-dating rather than voiding: the cohort module's REST resource counts a voided row
+		// when it rejects a duplicate, so a voided member could not be added back through it.
 		int removed = 0;
 		for (Map.Entry<Integer, CohortMember> entry : active.entrySet()) {
 			if (!flagged.contains(entry.getKey())) {
