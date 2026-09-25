@@ -18,4 +18,35 @@
     <require_module version="3.0.10">org.openmrs.module.patientflags</require_module>
     <require_module version="3.7.3">org.openmrs.module.cohort</require_module>
   </require_modules>
+
+  <globalProperty>
+    <property>rhdflags.refreshIntervalSeconds</property>
+    <defaultValue>86400</defaultValue>
+    <description>
+      How often both scheduled tasks run, in seconds. Read only when a task is first registered,
+      because after that the interval belongs to the scheduler and overwriting it here would
+      discard whatever an administrator set in Manage Scheduler. To change it on a running
+      instance, edit the task there.
+    </description>
+  </globalProperty>
+
+  <globalProperty>
+    <property>rhdflags.listFlagTag</property>
+    <defaultValue></defaultValue>
+    <description>
+      Only flags carrying this tag are mirrored into a patient list. Leave empty to give every
+      enabled flag a list. Useful where some flags are a clinical signal on the chart and are not
+      worth a worklist of their own.
+    </description>
+  </globalProperty>
+
+  <globalProperty>
+    <property>rhdflags.listCohortType</property>
+    <defaultValue>System List</defaultValue>
+    <description>
+      Name of the cohort type given to lists this module creates. The type must already exist;
+      the module will not create one. Lists created before this value changes keep their original
+      type.
+    </description>
+  </globalProperty>
 </module>
