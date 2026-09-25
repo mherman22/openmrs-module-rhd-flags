@@ -1,5 +1,7 @@
 # OpenMRS RHD Flags module
 
+[![Build with Maven](https://github.com/mherman22/openmrs-module-rhd-flags/actions/workflows/build.yml/badge.svg)](https://github.com/mherman22/openmrs-module-rhd-flags/actions/workflows/build.yml)
+
 Scheduled maintenance for patient flags, and for the patient lists built from them.
 
 ## Why this exists
@@ -16,15 +18,19 @@ The module also ships a `PatientFlagTask`, but it is a `DaemonToken` runnable ra
 `org.openmrs.scheduler.Task`, so it cannot be registered with the scheduler, and its admin
 rebuild page sits behind CSRFGuard so it cannot be driven from a script.
 
-## Task
+## What it does
 
-**RHD Patient Flag Refresh** re-evaluates every enabled flag and writes only the difference, then
-mirrors each flag into a patient list of the same name.
+**RHD Patient Flag Refresh** runs once a day. It re-evaluates every enabled flag, writes only the
+rows that changed, and mirrors each flag into a patient list of the same name. It registers itself
+with the scheduler on first start, because Initializer has no domain for `scheduler_task_config`.
 
 Writing only the difference means this task resets a row's `date_created` only when the row's
 message has changed. patientflags itself resets it far more often: its AOP advice deletes and
 re-inserts a patient's rows on every clinical write, and saving a flag rebuilds all of that flag's
-rows. So `date_created` is not a record of how long a flag has been raised.
+rows. So `date_created` is not a record of how long a flag has been raised, and this task alone
+cannot make it one. Fixes for that are proposed upstream; see below.
+
+### Flag rows
 
 A row whose message has changed, such as a SQL flag whose `${n}` placeholders now evaluate to
 other values, is rewritten. The task therefore evaluates the message of every matching patient on
@@ -32,33 +38,36 @@ each run, which for a SQL flag with placeholders is one query per patient.
 
 Voided patient flag rows are ignored: a patient counts as flagged only through a live row.
 
+### Lists
+
+Membership comes from the live flag rows rather than from re-running the criteria, so a list and
+the patient chart never disagree. Removal from a list that is kept end-dates a membership rather
+than voiding it, because the cohort module's REST resource counts a voided row when it rejects a
+duplicate.
+
 Each list carries its flag's uuid, so a rename renames the list, and a cohort someone made by hand
 under the same name is left alone (the cohort module rejects the duplicate name, so that flag gets
 no list until one of the two is renamed). A rename onto such a name keeps the list's old name. When
 flags swap or rotate names, one list steps aside to a temporary name so the others can move: a two-
-flag swap settles within two runs, and a longer rotation takes more. A flag that is disabled,
-retired or no longer tagged keeps its list with every membership ended. A flag that is deleted has
-its list voided, memberships included; a `Source patient flag` cohort attribute holding the flag's
-uuid marks the lists this module made, so a hand-made cohort is never voided. A flag recreated under
-the deleted flag's uuid, as Initializer does, gets that list back with the flag's current patients,
-unless another cohort already holds the flag's name. A list someone voided stays voided. Membership
-comes from the live flag rows rather than from re-running the criteria.
+flag swap settles within two runs, and a longer rotation takes more.
 
-Removal from a list that is kept end-dates a membership rather than voiding it, because the cohort
-module's REST resource counts a voided row when it rejects a duplicate.
+A flag that is disabled, retired or no longer tagged keeps its list with every membership ended. A
+flag that is deleted has its list voided, memberships included; a `Source patient flag` cohort
+attribute holding the flag's uuid marks the lists this module made, so a hand-made cohort is never
+voided. A flag recreated under the deleted flag's uuid, as Initializer does, gets that list back
+with the flag's current patients, unless another cohort already holds the flag's name. A list
+someone voided stays voided.
 
-The task registers itself with the scheduler on first start, because Initializer has no domain for
-`scheduler_task_config`.
+### Upstream
 
-## Configuration
+Two of the reasons this module exists are defects in patientflags rather than facts of life, and
+both have fixes proposed against it: a schedulable task, and generation that reconciles instead of
+deleting and rebuilding. If those land, this module keeps the list syncing and sheds most of the
+reconciliation logic.
 
-| global property | default | meaning |
-| --- | --- | --- |
-| `rhdflags.listFlagTag` | empty | only give a list to flags carrying this tag; empty means all |
-| `rhdflags.listCohortType` | `System List` | cohort type for lists this module creates; created if missing, unless a voided type has that name |
+## Requirements
 
-The task runs once a day. The scheduler owns the interval once the task exists, so change it in
-**Administration > Manage Scheduler** rather than here.
+OpenMRS platform 2.4.0 or later, patientflags 3.0.10, cohort 3.7.3.
 
 ## Installing
 
@@ -72,9 +81,15 @@ starts it registers its own scheduled task, so there is nothing to configure to 
 Flags whose criteria have become true show up on the patient chart as usual, and each flag also
 appears under **Patient lists** as a list of the patients currently carrying it.
 
-## Requirements
+## Configuration
 
-OpenMRS platform 2.4.0 or later, patientflags 3.0.10, cohort 3.7.3.
+| global property | default | meaning |
+| --- | --- | --- |
+| `rhdflags.listFlagTag` | empty | only give a list to flags carrying this tag; empty means all |
+| `rhdflags.listCohortType` | `System List` | cohort type for lists this module creates; created if missing, unless a voided type has that name |
+
+The task runs once a day. The scheduler owns the interval once the task exists, so change it in
+**Administration > Manage Scheduler** rather than here.
 
 ## Building
 
