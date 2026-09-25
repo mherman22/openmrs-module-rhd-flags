@@ -52,6 +52,7 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 
 		assertEquals(1, count("select count(*) from patientflags_patient_flag where flag_id = " + flag.getFlagId()
 		        + " and voided = true"));
+		assertEquals(1, listsNamed("dismissed"));
 		assertEquals(0, activeMembers("dismissed", MATCHING_PATIENT));
 	}
 
@@ -67,11 +68,10 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 	}
 
 	@Test
-	public void theRefreshAloneBringsTheListInStep() {
+	public void listsAFlagsPatientsAfterARun() {
 		saveFlag("overdue", MATCHES_ONE);
 
-		Context.flushSession();
-		new PatientFlagRefreshTask().execute();
+		runScheduledWork();
 
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
 	}

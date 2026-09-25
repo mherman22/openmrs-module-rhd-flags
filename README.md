@@ -34,10 +34,10 @@ Voided patient flag rows are ignored: a patient counts as flagged only through a
 
 Each list carries its flag's uuid, so a rename renames the list, and a cohort someone made by hand
 under the same name is left alone (the cohort module rejects the duplicate name, so that flag gets
-no list until one of the two is renamed). A rename onto such a name keeps the list's old name. A flag that is disabled, retired or no longer tagged
-keeps its list with every membership ended. A list someone voided stays voided. Membership comes
-from the flags already evaluated rather than from re-running the criteria, so a list and the
-patient chart never disagree.
+no list until one of the two is renamed). A rename onto such a name keeps the list's old name. A
+flag that is disabled, retired or no longer tagged keeps its list with every membership ended. A
+list someone voided stays voided. Membership comes from the flags already evaluated rather than
+from re-running the criteria, so a list and the patient chart never disagree.
 
 Removal end-dates a membership rather than voiding it. The cohort module counts a voided row when
 it rejects a duplicate, so a voided member could never rejoin the list.

@@ -87,7 +87,8 @@ public class FlagListSync {
 		} else if (!flag.getName().equals(list.getName())) {
 			// Checked before touching the list: a rejected save leaves the new name dirty in the
 			// session, and the next commit writes it anyway.
-			if (cohortService.getCohortM(flag.getName()) == null) {
+			CohortM holder = cohortService.getCohortM(flag.getName());
+			if (holder == null || holder.getUuid().equals(list.getUuid())) {
 				list.setName(flag.getName());
 				list.setDescription(description(flag));
 				cohortService.saveCohortM(list);
