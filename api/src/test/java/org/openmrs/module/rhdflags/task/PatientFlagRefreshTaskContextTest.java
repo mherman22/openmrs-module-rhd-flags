@@ -1,3 +1,12 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public License,
+ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
+ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
+ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
+ *
+ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
+ * graphic logo is a trademark of OpenMRS Inc.
+ */
 package org.openmrs.module.rhdflags.task;
 
 import static org.junit.Assert.assertEquals;
@@ -35,87 +44,87 @@ import org.openmrs.module.patientflags.evaluator.SQLFlagEvaluator;
 import org.openmrs.test.BaseModuleContextSensitiveTest;
 
 public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiveTest {
-
+	
 	private static final int MATCHING_PATIENT = 7;
-
+	
 	private static final int OTHER_PATIENT = 2;
-
+	
 	private static final String MATCHES_ONE = "select patient_id from patient where patient_id = " + MATCHING_PATIENT;
-
+	
 	private static final String MATCHES_NOBODY = "select patient_id from patient where patient_id = -1";
-
+	
 	private FlagService flagService;
-
+	
 	@Before
 	public void setUp() {
 		flagService = Context.getService(FlagService.class);
 		saveCohortType("System List");
 	}
-
+	
 	@Test
 	public void keepsAPatientWhoseFlagWasVoidedOffTheList() {
 		Flag flag = saveFlag("dismissed", MATCHES_NOBODY);
 		voidedFlagFor(flag);
-
+		
 		runScheduledWork();
-
-		assertEquals(1, count("select count(*) from patientflags_patient_flag where flag_id = " + flag.getFlagId()
-		        + " and voided = true"));
+		
+		assertEquals(1, count(
+		    "select count(*) from patientflags_patient_flag where flag_id = " + flag.getFlagId() + " and voided = true"));
 		assertEquals(1, listsNamed("dismissed"));
 		assertEquals(0, activeMembers("dismissed", MATCHING_PATIENT));
 	}
-
+	
 	@Test
 	public void raisesAFlagAgainWhenItsOnlyRowWasVoidedAndThePatientStillMatches() {
 		Flag flag = saveFlag("still matching", MATCHES_ONE);
 		voidedFlagFor(flag);
-
+		
 		runScheduledWork();
-
+		
 		assertEquals(1, count("select count(*) from patientflags_patient_flag where flag_id = " + flag.getFlagId()
 		        + " and patient_id = " + MATCHING_PATIENT + " and voided = false"));
 	}
-
+	
 	@Test
 	public void listsAFlagsPatientsAfterARun() {
 		saveFlag("overdue", MATCHES_ONE);
-
+		
 		runScheduledWork();
-
+		
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
 	}
-
+	
 	@Test
 	public void endsTheListOfAFlagThatHasBeenDisabled() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
-
+		
 		flag = flagService.getFlag(flag.getFlagId());
 		flag.setEnabled(Boolean.FALSE);
 		flagService.saveFlag(flag);
 		runScheduledWork();
-
+		
 		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
 		assertEquals(1, listsNamed("overdue"));
 	}
-
+	
 	@Test
 	public void endsTheListOfAFlagThatHasBeenRetired() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
-
+		
 		flag = flagService.getFlag(flag.getFlagId());
 		flag.setRetired(Boolean.TRUE);
 		flag.setRetireReason("replaced");
 		flagService.saveFlag(flag);
 		runScheduledWork();
-
+		
 		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
 		assertEquals(1, listsNamed("overdue"));
 	}
-
+	
 	@Test
 	public void endsTheListOfAFlagThatNoLongerCarriesTheListTag() {
 		Tag tag = new Tag();
@@ -127,51 +136,51 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		flagService.saveFlag(flag);
 		runScheduledWork();
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
-
+		
 		flag = flagService.getFlag(flag.getFlagId());
 		flag.getTags().clear();
 		flagService.saveFlag(flag);
 		runScheduledWork();
-
+		
 		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
 		assertEquals(1, listsNamed("overdue"));
 	}
-
+	
 	@Test
 	public void neverListsAFlagWithoutTheListTag() {
 		Context.getAdministrationService().saveGlobalProperty(new GlobalProperty("rhdflags.listFlagTag", "worklist"));
 		saveFlag("overdue", MATCHES_ONE);
-
+		
 		runScheduledWork();
-
+		
 		assertEquals(0, listsNamed("overdue"));
 	}
-
+	
 	@Test
 	public void neverRaisesOrListsADisabledFlag() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		flag.setEnabled(Boolean.FALSE);
 		flagService.saveFlag(flag);
-
+		
 		runScheduledWork();
-
+		
 		assertEquals(0, liveRows(flag));
 		assertEquals(0, listsNamed("overdue"));
 	}
-
+	
 	@Test
 	public void neverRaisesOrListsARetiredFlag() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		flag.setRetired(Boolean.TRUE);
 		flag.setRetireReason("replaced");
 		flagService.saveFlag(flag);
-
+		
 		runScheduledWork();
-
+		
 		assertEquals(0, liveRows(flag));
 		assertEquals(0, listsNamed("overdue"));
 	}
-
+	
 	@Test
 	public void listsAPatientAgainWhoFallsBackUnderTheFlag() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
@@ -179,40 +188,40 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		setCriteria(flag, MATCHES_NOBODY);
 		runScheduledWork();
 		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
-
+		
 		setCriteria(flag, MATCHES_ONE);
 		runScheduledWork();
-
+		
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
 	}
-
+	
 	@Test
 	public void followsAFlagThroughARenameWithoutASecondList() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
-
+		
 		flag = flagService.getFlag(flag.getFlagId());
 		flag.setName("prophylaxis overdue");
 		flagService.saveFlag(flag);
 		runScheduledWork();
-
+		
 		assertEquals(0, listsNamed("overdue"));
 		assertEquals(1, listsNamed("prophylaxis overdue"));
 		assertEquals(1, activeMembers("prophylaxis overdue", MATCHING_PATIENT));
 	}
-
+	
 	@Test
 	public void listsFollowTwoFlagsThatSwapNames() {
 		Flag first = saveFlag("overdue", MATCHES_ONE);
 		Flag second = saveFlag("lost to follow-up", "select patient_id from patient where patient_id = " + OTHER_PATIENT);
 		runScheduledWork();
-
+		
 		rename(first, "swapping");
 		rename(second, "overdue");
 		rename(first, "lost to follow-up");
 		runScheduledWork();
 		runScheduledWork();
-
+		
 		assertEquals(1, listsNamed("overdue"));
 		assertEquals(1, activeMembers("overdue", OTHER_PATIENT));
 		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
@@ -220,139 +229,138 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		assertEquals(1, activeMembers("lost to follow-up", MATCHING_PATIENT));
 		assertEquals(0, activeMembers("lost to follow-up", OTHER_PATIENT));
 	}
-
+	
 	@Test
 	public void waitsForTheListInItsWayRatherThanTakingAStandInName() {
 		Flag first = saveFlag("alpha", MATCHES_ONE);
 		Flag second = saveFlag("beta", "select patient_id from patient where patient_id = " + OTHER_PATIENT);
 		runScheduledWork();
-
+		
 		rename(second, "gamma");
 		rename(first, "beta");
 		assertEquals(0, errorsLoggedDuringScheduledWork());
 		assertEquals(0, count("select count(*) from cohort where name like '%(%'"));
 		runScheduledWork();
-
+		
 		assertEquals(1, activeMembers("beta", MATCHING_PATIENT));
 		assertEquals(1, activeMembers("gamma", OTHER_PATIENT));
 	}
-
+	
 	@Test
 	public void keepsItsNameWhenTheListInItsWayIsStuckBehindAHandMadeOne() {
 		saveHandMadeList("lost to follow-up", OTHER_PATIENT);
 		Flag first = saveFlag("overdue", MATCHES_ONE);
 		Flag second = saveFlag("follow-up due", MATCHES_ONE);
 		runScheduledWork();
-
+		
 		rename(second, "lost to follow-up");
 		rename(first, "follow-up due");
 		first = flagService.getFlag(first.getFlagId());
-		first.setCriteria("select patient_id from patient where patient_id in (" + MATCHING_PATIENT + ", "
-		        + OTHER_PATIENT + ")");
+		first.setCriteria(
+		    "select patient_id from patient where patient_id in (" + MATCHING_PATIENT + ", " + OTHER_PATIENT + ")");
 		flagService.saveFlag(first);
 		runScheduledWork();
 		runScheduledWork();
-
+		
 		assertEquals(1, listsNamed("overdue"));
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
 		assertEquals(1, activeMembers("overdue", OTHER_PATIENT));
 	}
-
+	
 	@Test
 	public void leavesAHandMadeListWithTheFlagsNameAlone() {
 		saveHandMadeList("overdue", OTHER_PATIENT);
 		saveFlag("overdue", MATCHES_ONE);
-
+		
 		runScheduledWork();
-
+		
 		assertEquals(1, listsNamed("overdue"));
 		assertEquals(1, activeMembers("overdue", OTHER_PATIENT));
 		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
 	}
-
+	
 	@Test
 	public void keepsTheOldNameWhenARenameWouldTakeAHandMadeListsName() {
 		saveHandMadeList("prophylaxis overdue", OTHER_PATIENT);
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
-
+		
 		flag = flagService.getFlag(flag.getFlagId());
 		flag.setName("prophylaxis overdue");
 		flagService.saveFlag(flag);
 		runScheduledWork();
-
+		
 		assertEquals(1, listsNamed("prophylaxis overdue"));
 		assertEquals(1, activeMembers("prophylaxis overdue", OTHER_PATIENT));
 		assertEquals(0, activeMembers("prophylaxis overdue", MATCHING_PATIENT));
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
 	}
-
+	
 	@Test
 	public void createsTheConfiguredCohortTypeWhenItIsMissing() {
-		Context.getAdministrationService().saveGlobalProperty(
-		    new GlobalProperty("rhdflags.listCohortType", "Flag Lists"));
+		Context.getAdministrationService().saveGlobalProperty(new GlobalProperty("rhdflags.listCohortType", "Flag Lists"));
 		saveFlag("overdue", MATCHES_ONE);
-
+		
 		runScheduledWork();
-
+		
 		assertNotNull(Context.getService(CohortTypeService.class).getCohortTypeByName("Flag Lists"));
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
 	}
-
+	
 	@Test
 	public void doesNotRecreateACohortTypeThatWasVoided() {
 		CohortTypeService cohortTypeService = Context.getService(CohortTypeService.class);
 		cohortTypeService.voidCohortType(cohortTypeService.getCohortTypeByName("System List"), "not wanted");
 		saveFlag("overdue", MATCHES_ONE);
-
+		
 		runScheduledWork();
-
+		
 		assertEquals(1, count("select count(*) from cohort_type where name = 'System List'"));
 		assertEquals(0, listsNamed("overdue"));
 	}
-
+	
 	@Test
 	public void doesNotRecreateAListThatWasVoided() {
 		saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
 		CohortService cohortService = Context.getService(CohortService.class);
 		cohortService.voidCohortM(cohortService.getCohortM("overdue"), "not wanted");
-
+		
 		assertEquals(0, errorsLoggedDuringScheduledWork());
 		assertEquals(1, count("select count(*) from cohort where name = 'overdue'"));
 		assertEquals(0, listsNamed("overdue"));
 	}
-
+	
 	@Test
 	public void restoresThePurgedListOfAFlagRecreatedUnderItsUuid() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
 		purge(flag);
 		runScheduledWork();
-
+		
 		saveFlag("overdue", MATCHES_ONE, flag.getUuid());
 		runScheduledWork();
 		runScheduledWork();
-
+		
 		assertEquals(1, listsNamed("overdue"));
 		assertEquals(1, activeMembersOfList(flag.getUuid(), MATCHING_PATIENT));
 		assertEquals(1, count("select count(*) from cohort_attribute"));
 	}
-
+	
 	@Test
 	public void restoresThePurgedListOfAFlagRecreatedUnderItsUuidWithANewName() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
 		purge(flag);
 		runScheduledWork();
-
+		
 		saveFlag("prophylaxis overdue", MATCHES_ONE, flag.getUuid());
 		runScheduledWork();
-
+		
 		assertEquals(0, count("select count(*) from cohort where voided = false and name = 'overdue'"));
 		assertEquals(1, activeMembers("prophylaxis overdue", MATCHING_PATIENT));
 	}
-
+	
 	@Test
 	public void keepsAPurgedListVoidedWhileAHandMadeListHoldsTheRecreatedFlagsName() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
@@ -360,65 +368,65 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		purge(flag);
 		runScheduledWork();
 		saveHandMadeList("prophylaxis overdue", OTHER_PATIENT);
-
+		
 		saveFlag("prophylaxis overdue", MATCHES_ONE, flag.getUuid());
 		runScheduledWork();
-
+		
 		assertEquals(0, listsNamed("overdue"));
 		assertEquals(1, listsNamed("prophylaxis overdue"));
 		assertEquals(1, activeMembers("prophylaxis overdue", OTHER_PATIENT));
 		assertEquals(0, activeMembers("prophylaxis overdue", MATCHING_PATIENT));
 	}
-
+	
 	@Test
 	public void voidsTheListOfAFlagThatHasBeenPurged() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
 		assertEquals(1, activeMembersOfList(flag.getUuid(), MATCHING_PATIENT));
-
+		
 		purge(flag);
 		runScheduledWork();
-
+		
 		assertEquals(0, activeMembersOfList(flag.getUuid(), MATCHING_PATIENT));
 		assertEquals(0, listsNamed("overdue"));
 		assertEquals(0, count("select count(*) from cohort_member where voided = false"));
 	}
-
+	
 	@Test
 	public void givesANewFlagTheNameOfAPurgedFlagsListInOneRun() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
-
+		
 		purge(flag);
 		Flag replacement = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
-
+		
 		assertEquals(1, listsNamed("overdue"));
 		assertEquals(1, activeMembersOfList(replacement.getUuid(), MATCHING_PATIENT));
 	}
-
+	
 	@Test
 	public void voidsTheListOfAPurgedFlagWhenTheListPredatesItsMarker() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
 		execute("delete from cohort_attribute");
 		runScheduledWork();
-
+		
 		purge(flag);
 		runScheduledWork();
-
+		
 		assertEquals(0, activeMembersOfList(flag.getUuid(), MATCHING_PATIENT));
 	}
-
+	
 	@Test
 	public void marksEachListOnce() {
 		saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
 		runScheduledWork();
-
+		
 		assertEquals(1, count("select count(*) from cohort_attribute"));
 	}
-
+	
 	@Test
 	public void rewritesAMessageWhosePlaceholderValueHasChanged() {
 		execute("update person set gender = 'M' where person_id = " + MATCHING_PATIENT);
@@ -428,22 +436,22 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		flagService.saveFlag(flag);
 		runScheduledWork();
 		assertEquals("gender M", liveMessage(flag));
-
+		
 		execute("update person set gender = 'F' where person_id = " + MATCHING_PATIENT);
 		runScheduledWork();
-
+		
 		assertEquals("gender F", liveMessage(flag));
 	}
-
+	
 	private void runScheduledWork() {
 		Context.flushSession();
 		new PatientFlagRefreshTask().execute();
 	}
-
+	
 	private int errorsLoggedDuringScheduledWork() {
 		final List<LogEvent> errors = new ArrayList<LogEvent>();
 		AbstractAppender appender = new AbstractAppender("errors", null, null, true, Property.EMPTY_ARRAY) {
-
+			
 			@Override
 			public void append(LogEvent event) {
 				if (event.getLevel().isMoreSpecificThan(Level.ERROR)) {
@@ -466,11 +474,11 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		}
 		return errors.size();
 	}
-
+	
 	private Flag saveFlag(String name, String criteria) {
 		return saveFlag(name, criteria, UUID.randomUUID().toString());
 	}
-
+	
 	private Flag saveFlag(String name, String criteria, String uuid) {
 		Flag flag = new Flag();
 		flag.setUuid(uuid);
@@ -482,25 +490,25 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		flagService.saveFlag(flag);
 		return flag;
 	}
-
+	
 	private void rename(Flag flag, String name) {
 		Flag current = flagService.getFlag(flag.getFlagId());
 		current.setName(name);
 		flagService.saveFlag(current);
 		Context.flushSession();
 	}
-
+	
 	private void setCriteria(Flag flag, String criteria) {
 		Flag current = flagService.getFlag(flag.getFlagId());
 		current.setCriteria(criteria);
 		flagService.saveFlag(current);
 	}
-
+	
 	private long liveRows(Flag flag) {
-		return count("select count(*) from patientflags_patient_flag where voided = false and flag_id = "
-		        + flag.getFlagId());
+		return count(
+		    "select count(*) from patientflags_patient_flag where voided = false and flag_id = " + flag.getFlagId());
 	}
-
+	
 	private void purge(Flag flag) {
 		Flag current = flagService.getFlag(flag.getFlagId());
 		flagService.deletePatientFlagsForFlag(current);
@@ -508,12 +516,12 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		Context.flushSession();
 		assertEquals(0, count("select count(*) from patientflags_flag where flag_id = " + flag.getFlagId()));
 	}
-
+	
 	private void execute(String sql) {
 		Context.flushSession();
 		Context.getAdministrationService().executeSQL(sql, false);
 	}
-
+	
 	private String liveMessage(Flag flag) {
 		Context.flushSession();
 		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
@@ -521,7 +529,7 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		assertEquals(1, rows.size());
 		return (String) rows.get(0).get(0);
 	}
-
+	
 	private void saveHandMadeList(String name, int patientId) {
 		CohortM handMade = new CohortM();
 		handMade.setName(name);
@@ -534,36 +542,36 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		member.setStartDate(new Date());
 		Context.getService(CohortMemberService.class).saveCohortMember(member);
 	}
-
+	
 	private void voidedFlagFor(Flag flag) {
 		PatientFlag patientFlag = new PatientFlag(Context.getPatientService().getPatient(MATCHING_PATIENT), flag,
 		        flag.getMessage());
 		flagService.savePatientFlag(patientFlag);
 		flagService.voidPatientFlag(patientFlag, "dismissed");
 	}
-
+	
 	private void saveCohortType(String name) {
 		CohortType type = new CohortType();
 		type.setName(name);
 		type.setDescription(name);
 		Context.getService(CohortTypeService.class).saveCohortType(type);
 	}
-
+	
 	private long activeMembers(String listName, int patientId) {
 		return count("select count(*) from cohort_member m join cohort c on c.cohort_id = m.cohort_id where c.name = '"
 		        + listName + "' and c.voided = false and m.patient_id = " + patientId
 		        + " and m.end_date is null and m.voided = false");
 	}
-
+	
 	private long activeMembersOfList(String uuid, int patientId) {
 		return count("select count(*) from cohort_member m join cohort c on c.cohort_id = m.cohort_id where c.uuid = '"
 		        + uuid + "' and m.patient_id = " + patientId + " and m.end_date is null and m.voided = false");
 	}
-
+	
 	private long listsNamed(String name) {
 		return count("select count(*) from cohort where voided = false and name = '" + name + "'");
 	}
-
+	
 	private long count(String sql) {
 		Context.flushSession();
 		List<List<Object>> rows = Context.getAdministrationService().executeSQL(sql, true);

@@ -1,3 +1,12 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public License,
+ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
+ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
+ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
+ *
+ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
+ * graphic logo is a trademark of OpenMRS Inc.
+ */
 package org.openmrs.module.rhdflags;
 
 import java.util.Date;
@@ -11,22 +20,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Registers the flag refresh with the scheduler on first start.
- *
- * Initializer has no domain for scheduler_task_config, and the patientflags module registers
- * nothing of its own, so without this the task would have to be created by hand in the admin UI
- * on every environment.
+ * Registers the flag refresh with the scheduler on first start. Initializer has no domain for
+ * scheduler_task_config, and the patientflags module registers nothing of its own, so without this
+ * the task would have to be created by hand in the admin UI on every environment.
  */
 public class RhdFlagsActivator extends BaseModuleActivator {
-
+	
 	public static final String REFRESH_TASK_NAME = "RHD Patient Flag Refresh";
-
+	
 	public static final String INTERVAL_PROPERTY = "rhdflags.refreshIntervalSeconds";
-
+	
 	private static final long DEFAULT_INTERVAL_SECONDS = 86400L;
-
+	
 	private static final Logger log = LoggerFactory.getLogger(RhdFlagsActivator.class);
-
+	
 	@Override
 	public void started() {
 		schedule(REFRESH_TASK_NAME, PatientFlagRefreshTask.class.getName(),
@@ -34,7 +41,7 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 		            + " flag into a patient list of the same name.");
 		log.info("RHD Flags module started");
 	}
-
+	
 	private void schedule(String name, String taskClass, String description) {
 		try {
 			SchedulerService schedulerService = Context.getSchedulerService();
@@ -42,7 +49,7 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 				log.debug("'{}' is already registered", name);
 				return;
 			}
-
+			
 			TaskDefinition task = new TaskDefinition();
 			task.setName(name);
 			task.setDescription(description);
@@ -51,7 +58,7 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 			task.setRepeatInterval(intervalSeconds());
 			task.setStartOnStartup(Boolean.TRUE);
 			task.setStarted(Boolean.TRUE);
-
+			
 			schedulerService.saveTaskDefinition(task);
 			schedulerService.scheduleTask(task);
 			log.info("Registered '{}' every {}s", name, task.getRepeatInterval());
@@ -62,7 +69,7 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 			log.error("Could not schedule '{}'", name, e);
 		}
 	}
-
+	
 	private Long intervalSeconds() {
 		String configured = Context.getAdministrationService().getGlobalProperty(INTERVAL_PROPERTY);
 		if (configured != null && !configured.trim().isEmpty()) {
@@ -75,7 +82,7 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 		}
 		return DEFAULT_INTERVAL_SECONDS;
 	}
-
+	
 	@Override
 	public void stopped() {
 		log.info("RHD Flags module stopped");

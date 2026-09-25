@@ -1,3 +1,12 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public License,
+ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
+ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
+ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
+ *
+ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
+ * graphic logo is a trademark of OpenMRS Inc.
+ */
 package org.openmrs.module.rhdflags.task;
 
 import static org.junit.Assert.assertEquals;
@@ -26,15 +35,15 @@ import org.openmrs.module.patientflags.PatientFlag;
 import org.openmrs.module.patientflags.api.FlagService;
 
 public class PatientFlagRefreshTaskTest {
-
+	
 	private FlagService flagService;
-
+	
 	private Flag flag;
-
+	
 	private Set<Integer> alreadyFlagged;
-
+	
 	private PatientFlagRefreshTask task;
-
+	
 	@Before
 	public void setUp() {
 		flagService = mock(FlagService.class);
@@ -44,9 +53,9 @@ public class PatientFlagRefreshTaskTest {
 		flag.setMessage("overdue");
 		flag.setEnabled(Boolean.TRUE);
 		alreadyFlagged = new LinkedHashSet<Integer>();
-
+		
 		task = new PatientFlagRefreshTask() {
-
+			
 			@Override
 			Map<Integer, String> alreadyFlagged(Flag flag) {
 				Map<Integer, String> messages = new LinkedHashMap<Integer, String>();
@@ -57,7 +66,7 @@ public class PatientFlagRefreshTaskTest {
 			}
 		};
 	}
-
+	
 	private void matches(Integer... patientIds) {
 		Cohort cohort = new Cohort();
 		for (Integer patientId : patientIds) {
@@ -65,32 +74,32 @@ public class PatientFlagRefreshTaskTest {
 		}
 		when(flagService.getFlaggedPatients(eq(flag), any(Map.class))).thenReturn(cohort);
 	}
-
+	
 	@Test
 	public void raisesAFlagForAPatientThatHasStartedMatching() {
 		matches(7);
-
+		
 		int[] delta = task.reconcile(flagService, flag);
-
+		
 		assertEquals(1, delta[0]);
 		assertEquals(0, delta[1]);
 		ArgumentCaptor<PatientFlag> saved = ArgumentCaptor.forClass(PatientFlag.class);
 		verify(flagService).savePatientFlag(saved.capture());
 		assertEquals(Integer.valueOf(7), saved.getValue().getPatient().getPatientId());
 	}
-
+	
 	@Test
 	public void clearsAFlagForAPatientThatHasStoppedMatching() {
 		alreadyFlagged.addAll(Arrays.asList(7));
 		matches();
-
+		
 		int[] delta = task.reconcile(flagService, flag);
-
+		
 		assertEquals(0, delta[0]);
 		assertEquals(1, delta[1]);
 		verify(flagService).deletePatientFlagForPatient(any(Patient.class), eq(flag));
 	}
-
+	
 	/**
 	 * Rewriting a row that did not change would reset its date_created.
 	 */
@@ -98,35 +107,35 @@ public class PatientFlagRefreshTaskTest {
 	public void leavesAPatientThatStillMatchesUntouched() {
 		alreadyFlagged.addAll(Arrays.asList(7));
 		matches(7);
-
+		
 		int[] delta = task.reconcile(flagService, flag);
-
+		
 		assertEquals(0, delta[0]);
 		assertEquals(0, delta[1]);
 		verify(flagService, never()).savePatientFlag(any(PatientFlag.class));
 		verify(flagService, never()).deletePatientFlagForPatient(any(Patient.class), any(Flag.class));
 	}
-
+	
 	@Test
 	public void addsAndRemovesInTheSamePassWithoutDisturbingTheRest() {
 		alreadyFlagged.addAll(Arrays.asList(7, 8));
 		matches(8, 9);
-
+		
 		int[] delta = task.reconcile(flagService, flag);
-
+		
 		assertEquals(1, delta[0]);
 		assertEquals(1, delta[1]);
 		verify(flagService, times(1)).savePatientFlag(any(PatientFlag.class));
 		verify(flagService, times(1)).deletePatientFlagForPatient(any(Patient.class), eq(flag));
 	}
-
+	
 	@Test
 	public void treatsAnEmptyResultAsNobodyMatching() {
 		alreadyFlagged.addAll(new HashSet<Integer>(Arrays.asList(7)));
 		when(flagService.getFlaggedPatients(eq(flag), any(Map.class))).thenReturn(null);
-
+		
 		int[] delta = task.reconcile(flagService, flag);
-
+		
 		assertEquals(0, delta[0]);
 		assertEquals(1, delta[1]);
 	}

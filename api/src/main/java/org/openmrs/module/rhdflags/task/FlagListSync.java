@@ -1,3 +1,12 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public License,
+ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
+ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
+ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
+ *
+ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
+ * graphic logo is a trademark of OpenMRS Inc.
+ */
 package org.openmrs.module.rhdflags.task;
 
 import java.util.Collection;
@@ -30,20 +39,20 @@ import org.slf4j.LoggerFactory;
  * Keying by uuid lets a list follow a rename and leaves hand-made cohorts of the same name alone.
  */
 public class FlagListSync {
-
+	
 	public static final String TAG_PROPERTY = "rhdflags.listFlagTag";
-
+	
 	public static final String COHORT_TYPE_PROPERTY = "rhdflags.listCohortType";
-
+	
 	private static final String DEFAULT_COHORT_TYPE = "System List";
-
+	
 	// Marks the module's lists, so one whose flag was purged can be told from a hand-made cohort.
 	private static final String MARKER_TYPE_UUID = "11b3c2f6-b196-4476-8f2e-1f1147d6db31";
-
+	
 	private static final String PURGED_REASON = "Its patient flag was purged";
-
+	
 	private static final Logger log = LoggerFactory.getLogger(FlagListSync.class);
-
+	
 	public void syncAll() {
 		FlagService flagService = Context.getService(FlagService.class);
 		String requiredTag = Context.getAdministrationService().getGlobalProperty(TAG_PROPERTY);
@@ -52,7 +61,7 @@ public class FlagListSync {
 		for (Flag flag : flags) {
 			flagUuids.add(flag.getUuid());
 		}
-
+		
 		// Before the flags, so a new flag can take a purged flag's list name in the same run.
 		CohortService cohortService = Context.getService(CohortService.class);
 		Map<String, CohortM> marked = new HashMap<String, CohortM>();
@@ -63,7 +72,7 @@ public class FlagListSync {
 				cohortService.voidCohortM(marker.getCohort(), PURGED_REASON);
 			}
 		}
-
+		
 		for (Flag flag : flags) {
 			boolean listed = Boolean.TRUE.equals(flag.getEnabled()) && !Boolean.TRUE.equals(flag.getRetired())
 			        && carriesTag(flag, requiredTag);
@@ -75,7 +84,7 @@ public class FlagListSync {
 			}
 		}
 	}
-
+	
 	private boolean carriesTag(Flag flag, String requiredTag) {
 		if (requiredTag == null || requiredTag.trim().isEmpty()) {
 			return true;
@@ -90,10 +99,10 @@ public class FlagListSync {
 		}
 		return false;
 	}
-
+	
 	void sync(Flag flag, boolean listed, CohortM marked) {
 		CohortService cohortService = Context.getService(CohortService.class);
-
+		
 		CohortM list = cohortService.getCohortMByUuid(flag.getUuid());
 		if (list == null) {
 			if (!listed) {
@@ -129,23 +138,21 @@ public class FlagListSync {
 				list.setName(flag.getName() + " (" + flag.getUuid() + ")");
 				cohortService.saveCohortM(list);
 			} else {
-				log.warn("List '{}' keeps its name: another cohort is already called '{}'", list.getName(),
-				    flag.getName());
+				log.warn("List '{}' keeps its name: another cohort is already called '{}'", list.getName(), flag.getName());
 			}
 		}
-
+		
 		if (marked == null) {
 			mark(cohortService, list, flag);
 		}
-
-		setMembers(list,
-		    listed ? PatientFlagRefreshTask.flaggedMessages(flag).keySet() : Collections.<Integer> emptySet());
+		
+		setMembers(list, listed ? PatientFlagRefreshTask.flaggedMessages(flag).keySet() : Collections.<Integer> emptySet());
 	}
-
+	
 	private void setMembers(CohortM list, Set<Integer> flagged) {
 		CohortMemberService memberService = Context.getService(CohortMemberService.class);
 		Map<Integer, CohortMember> active = activeMembers(memberService, list);
-
+		
 		int added = 0;
 		for (Integer patientId : flagged) {
 			if (!active.containsKey(patientId)) {
@@ -157,7 +164,7 @@ public class FlagListSync {
 				added++;
 			}
 		}
-
+		
 		// End-date rather than void: the cohort REST resource counts voided rows as duplicates.
 		int removed = 0;
 		for (Map.Entry<Integer, CohortMember> entry : active.entrySet()) {
@@ -168,12 +175,12 @@ public class FlagListSync {
 				removed++;
 			}
 		}
-
+		
 		if (added > 0 || removed > 0) {
 			log.info("List '{}': {} added, {} ended", list.getName(), added, removed);
 		}
 	}
-
+	
 	private void mark(CohortService cohortService, CohortM list, Flag flag) {
 		CohortAttributeType type = cohortService.getCohortAttributeTypeByUuid(MARKER_TYPE_UUID);
 		if (type == null) {
@@ -190,7 +197,7 @@ public class FlagListSync {
 		marker.setValueReferenceInternal(flag.getUuid());
 		cohortService.saveCohortAttribute(marker);
 	}
-
+	
 	private boolean inRenameCycle(CohortService cohortService, CohortM holder, CohortM list) {
 		FlagService flagService = Context.getService(FlagService.class);
 		Set<String> seen = new HashSet<String>();
@@ -210,7 +217,7 @@ public class FlagListSync {
 		}
 		return false;
 	}
-
+	
 	private CohortM createList(CohortService cohortService, Flag flag) {
 		CohortM list = new CohortM();
 		list.setUuid(flag.getUuid());
@@ -221,20 +228,20 @@ public class FlagListSync {
 		log.info("Creating list '{}'", flag.getName());
 		return cohortService.saveCohortM(list);
 	}
-
+	
 	private String description(Flag flag) {
 		return "Patients currently flagged: " + flag.getName();
 	}
-
+	
 	/**
 	 * The cohort module's CohortService only finds unvoided cohorts by uuid.
 	 */
 	private boolean listWasVoided(Flag flag) {
-		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
-		    "select count(*) from cohort where uuid = '" + flag.getUuid().replace("'", "''") + "'", true);
+		List<List<Object>> rows = Context.getAdministrationService()
+		        .executeSQL("select count(*) from cohort where uuid = '" + flag.getUuid().replace("'", "''") + "'", true);
 		return ((Number) rows.get(0).get(0)).intValue() > 0;
 	}
-
+	
 	private CohortType cohortType() {
 		String configured = Context.getAdministrationService().getGlobalProperty(COHORT_TYPE_PROPERTY);
 		String wanted = (configured == null || configured.trim().isEmpty()) ? DEFAULT_COHORT_TYPE : configured.trim();
@@ -253,7 +260,7 @@ public class FlagListSync {
 		log.info("Creating cohort type '{}'", wanted);
 		return cohortTypeService.saveCohortType(type);
 	}
-
+	
 	private Map<Integer, CohortMember> activeMembers(CohortMemberService memberService, CohortM list) {
 		Map<Integer, CohortMember> active = new HashMap<Integer, CohortMember>();
 		Collection<CohortMember> members = memberService.findCohortMembersByCohortUuid(list.getUuid());

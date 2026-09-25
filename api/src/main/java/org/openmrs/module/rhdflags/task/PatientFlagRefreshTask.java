@@ -1,3 +1,12 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public License,
+ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
+ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
+ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
+ *
+ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
+ * graphic logo is a trademark of OpenMRS Inc.
+ */
 package org.openmrs.module.rhdflags.task;
 
 import java.util.HashMap;
@@ -19,18 +28,19 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Re-evaluates every enabled flag, writing only the rows that changed, then syncs the flag lists.
- * patientflags evaluates only on writes, so without this a criterion that time makes true never fires.
+ * patientflags evaluates only on writes, so without this a criterion that time makes true never
+ * fires.
  */
 public class PatientFlagRefreshTask extends AbstractTask {
-
+	
 	private static final Logger log = LoggerFactory.getLogger(PatientFlagRefreshTask.class);
-
+	
 	@Override
 	public void execute() {
 		FlagService flagService = Context.getService(FlagService.class);
 		int added = 0;
 		int removed = 0;
-
+		
 		for (Flag flag : flagService.getAllFlags()) {
 			if (!Boolean.TRUE.equals(flag.getEnabled()) || Boolean.TRUE.equals(flag.getRetired())) {
 				continue;
@@ -45,20 +55,20 @@ public class PatientFlagRefreshTask extends AbstractTask {
 				log.error("Could not refresh flag '{}'", flag.getName(), e);
 			}
 		}
-
+		
 		log.info("Patient flag refresh complete: {} raised, {} cleared", added, removed);
-
+		
 		// Clear the refresh's rows first, or every commit the sync makes dirty-checks them all.
 		Context.flushSession();
 		Context.clearSession();
 		new FlagListSync().syncAll();
 	}
-
+	
 	int[] reconcile(FlagService flagService, Flag flag) {
 		Map<Object, Object> evaluationContext = new HashMap<Object, Object>();
 		Set<Integer> matching = evaluate(flagService, flag, evaluationContext);
 		Map<Integer, String> alreadyFlagged = alreadyFlagged(flag);
-
+		
 		int added = 0;
 		for (Integer patientId : matching) {
 			String message = message(flag, patientId, evaluationContext);
@@ -70,7 +80,7 @@ public class PatientFlagRefreshTask extends AbstractTask {
 				flagService.savePatientFlag(new PatientFlag(new Patient(patientId), flag, message));
 			}
 		}
-
+		
 		int removed = 0;
 		for (Integer patientId : alreadyFlagged.keySet()) {
 			if (!matching.contains(patientId)) {
@@ -78,13 +88,13 @@ public class PatientFlagRefreshTask extends AbstractTask {
 				removed++;
 			}
 		}
-
+		
 		if (added > 0 || removed > 0) {
 			log.debug("Flag '{}': {} raised, {} cleared", flag.getName(), added, removed);
 		}
 		return new int[] { added, removed };
 	}
-
+	
 	private Set<Integer> evaluate(FlagService flagService, Flag flag, Map<Object, Object> evaluationContext) {
 		Set<Integer> patientIds = new HashSet<Integer>();
 		Cohort cohort = flagService.getFlaggedPatients(flag, evaluationContext);
@@ -95,20 +105,21 @@ public class PatientFlagRefreshTask extends AbstractTask {
 		}
 		return patientIds;
 	}
-
+	
 	Map<Integer, String> alreadyFlagged(Flag flag) {
 		return flaggedMessages(flag);
 	}
-
+	
 	/**
-	 * Reads a flag's unvoided rows directly, as FlagService cannot list a flag's patients.
-	 * A voided row must not count, or the flag is never raised again for that patient.
+	 * Reads a flag's unvoided rows directly, as FlagService cannot list a flag's patients. A voided row
+	 * must not count, or the flag is never raised again for that patient.
 	 */
 	static Map<Integer, String> flaggedMessages(Flag flag) {
 		Map<Integer, String> messages = new HashMap<Integer, String>();
-		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
-		    "select patient_id, message from patientflags_patient_flag where flag_id = " + flag.getFlagId()
-		            + " and voided = false", true);
+		List<List<Object>> rows = Context.getAdministrationService()
+		        .executeSQL("select patient_id, message from patientflags_patient_flag where flag_id = " + flag.getFlagId()
+		                + " and voided = false",
+		            true);
 		if (rows != null) {
 			for (List<Object> row : rows) {
 				if (row != null && !row.isEmpty() && row.get(0) != null) {
@@ -118,10 +129,10 @@ public class PatientFlagRefreshTask extends AbstractTask {
 		}
 		return messages;
 	}
-
+	
 	/**
-	 * Custom evaluators hand back their own text per patient through the evaluation context;
-	 * everything else falls back to the flag's own message.
+	 * Custom evaluators hand back their own text per patient through the evaluation context; everything
+	 * else falls back to the flag's own message.
 	 */
 	@SuppressWarnings("unchecked")
 	private String message(Flag flag, Integer patientId, Map<Object, Object> evaluationContext) {
