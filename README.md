@@ -34,7 +34,7 @@ Voided patient flag rows are ignored: a patient counts as flagged only through a
 
 Each list carries its flag's uuid, so a rename renames the list, and a cohort someone made by hand
 under the same name is left alone (the cohort module rejects the duplicate name, so that flag gets
-no list until one of the two is renamed). A flag that is disabled, retired or no longer tagged
+no list until one of the two is renamed). A rename onto such a name keeps the list's old name. A flag that is disabled, retired or no longer tagged
 keeps its list with every membership ended. A list someone voided stays voided. Membership comes
 from the flags already evaluated rather than from re-running the criteria, so a list and the
 patient chart never disagree.
@@ -51,7 +51,7 @@ The task registers itself with the scheduler on first start, because Initializer
 | --- | --- | --- |
 | `rhdflags.refreshIntervalSeconds` | `86400` | how often the task runs |
 | `rhdflags.listFlagTag` | empty | only give a list to flags carrying this tag; empty means all |
-| `rhdflags.listCohortType` | `System List` | cohort type for lists this module creates; created if missing |
+| `rhdflags.listCohortType` | `System List` | cohort type for lists this module creates; created if missing, unless a voided type has that name |
 
 The interval is read when a task is first registered. Change it afterwards in
 **Administration > Manage Scheduler**.
