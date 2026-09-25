@@ -89,6 +89,19 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 	}
 
 	@Test
+	public void endsTheListOfAFlagThatHasBeenRetired() {
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+
+		flag.setRetired(Boolean.TRUE);
+		flag.setRetireReason("replaced");
+		flagService.saveFlag(flag);
+		runScheduledWork();
+
+		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
+	}
+
+	@Test
 	public void endsTheListOfAFlagThatNoLongerCarriesTheListTag() {
 		Tag tag = new Tag();
 		tag.setName("worklist");
