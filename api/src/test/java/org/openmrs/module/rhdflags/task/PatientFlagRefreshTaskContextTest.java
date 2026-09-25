@@ -135,6 +135,55 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 	}
 
 	@Test
+	public void neverListsAFlagWithoutTheListTag() {
+		Context.getAdministrationService().saveGlobalProperty(new GlobalProperty("rhdflags.listFlagTag", "worklist"));
+		saveFlag("overdue", MATCHES_ONE);
+
+		runScheduledWork();
+
+		assertEquals(0, listsNamed("overdue"));
+	}
+
+	@Test
+	public void neverRaisesOrListsADisabledFlag() {
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		flag.setEnabled(Boolean.FALSE);
+		flagService.saveFlag(flag);
+
+		runScheduledWork();
+
+		assertEquals(0, liveRows(flag));
+		assertEquals(0, listsNamed("overdue"));
+	}
+
+	@Test
+	public void neverRaisesOrListsARetiredFlag() {
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		flag.setRetired(Boolean.TRUE);
+		flag.setRetireReason("replaced");
+		flagService.saveFlag(flag);
+
+		runScheduledWork();
+
+		assertEquals(0, liveRows(flag));
+		assertEquals(0, listsNamed("overdue"));
+	}
+
+	@Test
+	public void listsAPatientAgainWhoFallsBackUnderTheFlag() {
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+		setCriteria(flag, MATCHES_NOBODY);
+		runScheduledWork();
+		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
+
+		setCriteria(flag, MATCHES_ONE);
+		runScheduledWork();
+
+		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
+	}
+
+	@Test
 	public void followsAFlagThroughARenameWithoutASecondList() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
@@ -436,6 +485,17 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		current.setName(name);
 		flagService.saveFlag(current);
 		Context.flushSession();
+	}
+
+	private void setCriteria(Flag flag, String criteria) {
+		Flag current = flagService.getFlag(flag.getFlagId());
+		current.setCriteria(criteria);
+		flagService.saveFlag(current);
+	}
+
+	private long liveRows(Flag flag) {
+		return count("select count(*) from patientflags_patient_flag where voided = false and flag_id = "
+		        + flag.getFlagId());
 	}
 
 	private void purge(Flag flag) {
