@@ -40,8 +40,8 @@ flag swap settles within two runs, and a longer rotation takes more. A flag that
 retired or no longer tagged keeps its list with every membership ended. A list someone voided stays
 voided. Membership comes from the live flag rows rather than from re-running the criteria.
 
-Removal end-dates a membership rather than voiding it. The cohort module's REST resource counts a
-voided row when it rejects a duplicate, so a voided member could not be added back through it.
+Removal end-dates a membership rather than voiding it, because the cohort module's REST resource
+counts a voided row when it rejects a duplicate.
 
 The task registers itself with the scheduler on first start, because Initializer has no domain for
 `scheduler_task_config`.

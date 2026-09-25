@@ -120,7 +120,7 @@ public class FlagListSync {
 		}
 
 		// End-dating rather than voiding: the cohort module's REST resource counts a voided row
-		// when it rejects a duplicate, so a voided member could not be added back through it.
+		// when it rejects a duplicate.
 		int removed = 0;
 		for (Map.Entry<Integer, CohortMember> entry : active.entrySet()) {
 			if (!flagged.contains(entry.getKey())) {
