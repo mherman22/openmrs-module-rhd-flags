@@ -18,17 +18,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Re-evaluates every enabled flag and writes only the difference.
- *
- * The patientflags module evaluates a flag when its definition is saved and through AOP advice
- * on clinical writes, so a criterion that becomes true purely because time passed never fires
- * on its own. This runs on the scheduler to close that gap.
- *
- * This adds and removes only what changed, so it never resets date_created itself. The
- * patientflags module still does: its AOP advice deletes and re-inserts a patient's rows on every
- * clinical write, so date_created does not say how long a flag has been raised.
- *
- * The flag lists are synced at the end of each run, so they reflect the rows just written.
+ * Re-evaluates every enabled flag, writing only the rows that changed, then syncs the flag lists.
+ * patientflags evaluates only on writes, so without this a criterion that time makes true never fires.
  */
 public class PatientFlagRefreshTask extends AbstractTask {
 
@@ -57,8 +48,7 @@ public class PatientFlagRefreshTask extends AbstractTask {
 
 		log.info("Patient flag refresh complete: {} raised, {} cleared", added, removed);
 
-		// Every row the refresh touched is still in the session, and each of the sync's commits
-		// would dirty-check them all.
+		// Clear the refresh's rows first, or every commit the sync makes dirty-checks them all.
 		Context.flushSession();
 		Context.clearSession();
 		new FlagListSync().syncAll();
@@ -108,9 +98,8 @@ public class PatientFlagRefreshTask extends AbstractTask {
 	}
 
 	/**
-	 * FlagService can read a patient's flags but not a flag's patients, so this reads the rows
-	 * directly. The id is an Integer from the flag itself, so it cannot carry a quote. A voided row
-	 * does not count, so it never stops the flag being raised again.
+	 * Reads a flag's unvoided rows directly, as FlagService cannot list a flag's patients.
+	 * A voided row must not count, or the flag is never raised again for that patient.
 	 */
 	static Set<Integer> flaggedPatientIds(Flag flag) {
 		Set<Integer> patientIds = new HashSet<Integer>();

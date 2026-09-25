@@ -23,15 +23,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Mirrors each patient flag into a patient list of the same name.
- *
- * Cohort membership is static and nothing recomputes it, so a list only keeps matching its flag
- * if something keeps the two in step. Membership is taken from the live flag rows rather than
- * from the criteria.
- *
- * A list shares its flag's uuid, so it follows the flag through a rename and a cohort someone
- * made by hand under the same name is never touched. A flag that is disabled, retired or missing
- * the rhdflags.listFlagTag tag keeps its list, emptied.
+ * Mirrors each patient flag's live rows into a patient list that shares the flag's uuid and name.
+ * Keying by uuid lets a list follow a rename and leaves hand-made cohorts of the same name alone.
  */
 public class FlagListSync {
 
@@ -86,16 +79,14 @@ public class FlagListSync {
 			}
 			list = createList(cohortService, flag);
 		} else if (!flag.getName().equals(list.getName())) {
-			// Checked before touching the list: a rejected save leaves the new name dirty in the
-			// session, and the next commit writes it anyway.
+			// Check before setName: a rejected save leaves the name dirty for the next commit to write.
 			CohortM holder = cohortService.getCohortM(flag.getName());
 			if (holder == null || holder.getUuid().equals(list.getUuid())) {
 				list.setName(flag.getName());
 				list.setDescription(description(flag));
 				cohortService.saveCohortM(list);
 			} else if (inRenameCycle(cohortService, holder, list)) {
-				// Flags that swap or rotate names block each other's lists for good unless one of
-				// them steps aside, freeing its old name for the next in the cycle.
+				// Without one list stepping aside, flags that swap names block each other's lists for good.
 				list.setName(flag.getName() + " (" + flag.getUuid() + ")");
 				cohortService.saveCohortM(list);
 			} else {
@@ -119,8 +110,7 @@ public class FlagListSync {
 			}
 		}
 
-		// End-dating rather than voiding: the cohort module's REST resource counts a voided row
-		// when it rejects a duplicate.
+		// End-date rather than void: the cohort REST resource counts voided rows as duplicates.
 		int removed = 0;
 		for (Map.Entry<Integer, CohortMember> entry : active.entrySet()) {
 			if (!flagged.contains(entry.getKey())) {
