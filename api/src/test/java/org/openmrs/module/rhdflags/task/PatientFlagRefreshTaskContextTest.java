@@ -262,6 +262,71 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		assertEquals(1, count("select count(*) from cohort where name = 'overdue'"));
 	}
 
+	@Test
+	public void voidsTheListOfAFlagThatHasBeenPurged() {
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+		assertEquals(1, activeMembersOfList(flag.getUuid(), MATCHING_PATIENT));
+
+		purge(flag);
+		runScheduledWork();
+
+		assertEquals(0, activeMembersOfList(flag.getUuid(), MATCHING_PATIENT));
+		assertEquals(0, listsNamed("overdue"));
+		assertEquals(0, count("select count(*) from cohort_member where voided = false"));
+	}
+
+	@Test
+	public void givesANewFlagTheNameOfAPurgedFlagsListInOneRun() {
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+
+		purge(flag);
+		Flag replacement = saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+
+		assertEquals(1, listsNamed("overdue"));
+		assertEquals(1, activeMembersOfList(replacement.getUuid(), MATCHING_PATIENT));
+	}
+
+	@Test
+	public void voidsTheListOfAPurgedFlagWhenTheListPredatesItsMarker() {
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+		execute("delete from cohort_attribute");
+		runScheduledWork();
+
+		purge(flag);
+		runScheduledWork();
+
+		assertEquals(0, activeMembersOfList(flag.getUuid(), MATCHING_PATIENT));
+	}
+
+	@Test
+	public void marksEachListOnce() {
+		saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+		runScheduledWork();
+
+		assertEquals(1, count("select count(*) from cohort_attribute"));
+	}
+
+	@Test
+	public void rewritesAMessageWhosePlaceholderValueHasChanged() {
+		execute("update person set gender = 'M' where person_id = " + MATCHING_PATIENT);
+		Flag flag = saveFlag("gender", "select p.patient_id, pe.gender from patient p join person pe"
+		        + " on pe.person_id = p.patient_id where p.patient_id = " + MATCHING_PATIENT);
+		flag.setMessage("gender ${1}");
+		flagService.saveFlag(flag);
+		runScheduledWork();
+		assertEquals("gender M", liveMessage(flag));
+
+		execute("update person set gender = 'F' where person_id = " + MATCHING_PATIENT);
+		runScheduledWork();
+
+		assertEquals("gender F", liveMessage(flag));
+	}
+
 	private void runScheduledWork() {
 		Context.flushSession();
 		new PatientFlagRefreshTask().execute();
@@ -283,6 +348,27 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		current.setName(name);
 		flagService.saveFlag(current);
 		Context.flushSession();
+	}
+
+	private void purge(Flag flag) {
+		Flag current = flagService.getFlag(flag.getFlagId());
+		flagService.deletePatientFlagsForFlag(current);
+		flagService.purgeFlag(current.getFlagId());
+		Context.flushSession();
+		assertEquals(0, count("select count(*) from patientflags_flag where flag_id = " + flag.getFlagId()));
+	}
+
+	private void execute(String sql) {
+		Context.flushSession();
+		Context.getAdministrationService().executeSQL(sql, false);
+	}
+
+	private String liveMessage(Flag flag) {
+		Context.flushSession();
+		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
+		    "select message from patientflags_patient_flag where voided = false and flag_id = " + flag.getFlagId(), true);
+		assertEquals(1, rows.size());
+		return (String) rows.get(0).get(0);
 	}
 
 	private void saveHandMadeList(String name, int patientId) {
@@ -316,6 +402,11 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		return count("select count(*) from cohort_member m join cohort c on c.cohort_id = m.cohort_id where c.name = '"
 		        + listName + "' and c.voided = false and m.patient_id = " + patientId
 		        + " and m.end_date is null and m.voided = false");
+	}
+
+	private long activeMembersOfList(String uuid, int patientId) {
+		return count("select count(*) from cohort_member m join cohort c on c.cohort_id = m.cohort_id where c.uuid = '"
+		        + uuid + "' and m.patient_id = " + patientId + " and m.end_date is null and m.voided = false");
 	}
 
 	private long listsNamed(String name) {

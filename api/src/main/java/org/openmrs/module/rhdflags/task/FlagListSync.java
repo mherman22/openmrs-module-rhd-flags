@@ -11,6 +11,9 @@ import java.util.Set;
 
 import org.openmrs.Patient;
 import org.openmrs.api.context.Context;
+import org.openmrs.customdatatype.datatype.FreeTextDatatype;
+import org.openmrs.module.cohort.CohortAttribute;
+import org.openmrs.module.cohort.CohortAttributeType;
 import org.openmrs.module.cohort.CohortM;
 import org.openmrs.module.cohort.CohortMember;
 import org.openmrs.module.cohort.CohortType;
@@ -34,17 +37,36 @@ public class FlagListSync {
 
 	private static final String DEFAULT_COHORT_TYPE = "System List";
 
+	// Marks the module's lists, so one whose flag was purged can be told from a hand-made cohort.
+	private static final String MARKER_TYPE_UUID = "11b3c2f6-b196-4476-8f2e-1f1147d6db31";
+
 	private static final Logger log = LoggerFactory.getLogger(FlagListSync.class);
 
 	public void syncAll() {
 		FlagService flagService = Context.getService(FlagService.class);
 		String requiredTag = Context.getAdministrationService().getGlobalProperty(TAG_PROPERTY);
+		List<Flag> flags = flagService.getAllFlags();
+		Set<String> flagUuids = new HashSet<String>();
+		for (Flag flag : flags) {
+			flagUuids.add(flag.getUuid());
+		}
 
-		for (Flag flag : flagService.getAllFlags()) {
+		// Before the flags, so a new flag can take a purged flag's list name in the same run.
+		CohortService cohortService = Context.getService(CohortService.class);
+		Set<String> marked = new HashSet<String>();
+		for (CohortAttribute marker : cohortService.findCohortAttributesByTypeUuid(MARKER_TYPE_UUID)) {
+			marked.add(marker.getValueReference());
+			if (!flagUuids.contains(marker.getValueReference())) {
+				// Voiding the list voids its memberships too.
+				cohortService.voidCohortM(marker.getCohort(), "Its patient flag was purged");
+			}
+		}
+
+		for (Flag flag : flags) {
 			boolean listed = Boolean.TRUE.equals(flag.getEnabled()) && !Boolean.TRUE.equals(flag.getRetired())
 			        && carriesTag(flag, requiredTag);
 			try {
-				sync(flag, listed);
+				sync(flag, listed, marked.contains(flag.getUuid()));
 			}
 			catch (Exception e) {
 				log.error("Could not sync the list for flag '{}'", flag.getName(), e);
@@ -67,9 +89,8 @@ public class FlagListSync {
 		return false;
 	}
 
-	void sync(Flag flag, boolean listed) {
+	void sync(Flag flag, boolean listed, boolean marked) {
 		CohortService cohortService = Context.getService(CohortService.class);
-		CohortMemberService memberService = Context.getService(CohortMemberService.class);
 
 		CohortM list = cohortService.getCohortMByUuid(flag.getUuid());
 		if (list == null) {
@@ -95,7 +116,16 @@ public class FlagListSync {
 			}
 		}
 
-		Set<Integer> flagged = listed ? PatientFlagRefreshTask.flaggedPatientIds(flag) : Collections.<Integer> emptySet();
+		if (!marked) {
+			mark(cohortService, list, flag);
+		}
+
+		setMembers(list,
+		    listed ? PatientFlagRefreshTask.flaggedMessages(flag).keySet() : Collections.<Integer> emptySet());
+	}
+
+	private void setMembers(CohortM list, Set<Integer> flagged) {
+		CohortMemberService memberService = Context.getService(CohortMemberService.class);
 		Map<Integer, CohortMember> active = activeMembers(memberService, list);
 
 		int added = 0;
@@ -122,8 +152,25 @@ public class FlagListSync {
 		}
 
 		if (added > 0 || removed > 0) {
-			log.info("List '{}': {} added, {} ended", flag.getName(), added, removed);
+			log.info("List '{}': {} added, {} ended", list.getName(), added, removed);
 		}
+	}
+
+	private void mark(CohortService cohortService, CohortM list, Flag flag) {
+		CohortAttributeType type = cohortService.getCohortAttributeTypeByUuid(MARKER_TYPE_UUID);
+		if (type == null) {
+			type = new CohortAttributeType();
+			type.setUuid(MARKER_TYPE_UUID);
+			type.setName("Source patient flag");
+			type.setDescription("The patient flag this list mirrors");
+			type.setDatatypeClassname(FreeTextDatatype.class.getName());
+			cohortService.saveCohortAttributeType(type);
+		}
+		CohortAttribute marker = new CohortAttribute();
+		marker.setAttributeType(type);
+		marker.setCohort(list);
+		marker.setValueReferenceInternal(flag.getUuid());
+		cohortService.saveCohortAttribute(marker);
 	}
 
 	private boolean inRenameCycle(CohortService cohortService, CohortM holder, CohortM list) {

@@ -21,14 +21,14 @@ rebuild page sits behind CSRFGuard so it cannot be driven from a script.
 **RHD Patient Flag Refresh** re-evaluates every enabled flag and writes only the difference, then
 mirrors each flag into a patient list of the same name.
 
-Writing only the difference means this task never resets a row's `date_created`. patientflags
-itself still does: its AOP advice deletes and re-inserts a patient's rows on every clinical write,
-and saving a flag rebuilds all of that flag's rows. So `date_created` is not a record of how long a
-flag has been raised.
+Writing only the difference means this task resets a row's `date_created` only when the row's
+message has changed. patientflags itself resets it far more often: its AOP advice deletes and
+re-inserts a patient's rows on every clinical write, and saving a flag rebuilds all of that flag's
+rows. So `date_created` is not a record of how long a flag has been raised.
 
-A row keeps the message it was written with while its patient keeps matching. A SQL flag whose
-message uses `${n}` placeholders therefore shows the values from the day it was raised, until
-patientflags rewrites the row on the patient's next clinical write.
+A row whose message has changed, such as a SQL flag whose `${n}` placeholders now evaluate to
+other values, is rewritten. The task therefore evaluates the message of every matching patient on
+each run, which for a SQL flag with placeholders is one query per patient.
 
 Voided patient flag rows are ignored: a patient counts as flagged only through a live row.
 
@@ -37,11 +37,13 @@ under the same name is left alone (the cohort module rejects the duplicate name,
 no list until one of the two is renamed). A rename onto such a name keeps the list's old name. When
 flags swap or rotate names, one list steps aside to a temporary name so the others can move: a two-
 flag swap settles within two runs, and a longer rotation takes more. A flag that is disabled,
-retired or no longer tagged keeps its list with every membership ended. A list someone voided stays
-voided. Membership comes from the live flag rows rather than from re-running the criteria.
+retired or no longer tagged keeps its list with every membership ended. A flag that is deleted has
+its list voided, memberships included; a `Source patient flag` cohort attribute holding the flag's
+uuid marks the lists this module made, so a hand-made cohort is never voided. A list someone voided
+stays voided. Membership comes from the live flag rows rather than from re-running the criteria.
 
-Removal end-dates a membership rather than voiding it, because the cohort module's REST resource
-counts a voided row when it rejects a duplicate.
+Removal from a list that is kept end-dates a membership rather than voiding it, because the cohort
+module's REST resource counts a voided row when it rejects a duplicate.
 
 The task registers itself with the scheduler on first start, because Initializer has no domain for
 `scheduler_task_config`.

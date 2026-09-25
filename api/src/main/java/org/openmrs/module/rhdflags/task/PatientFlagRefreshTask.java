@@ -57,19 +57,22 @@ public class PatientFlagRefreshTask extends AbstractTask {
 	int[] reconcile(FlagService flagService, Flag flag) {
 		Map<Object, Object> evaluationContext = new HashMap<Object, Object>();
 		Set<Integer> matching = evaluate(flagService, flag, evaluationContext);
-		Set<Integer> alreadyFlagged = alreadyFlagged(flag);
+		Map<Integer, String> alreadyFlagged = alreadyFlagged(flag);
 
 		int added = 0;
 		for (Integer patientId : matching) {
-			if (!alreadyFlagged.contains(patientId)) {
-				flagService.savePatientFlag(new PatientFlag(new Patient(patientId), flag,
-				    message(flag, patientId, evaluationContext)));
+			String message = message(flag, patientId, evaluationContext);
+			if (!alreadyFlagged.containsKey(patientId)) {
+				flagService.savePatientFlag(new PatientFlag(new Patient(patientId), flag, message));
 				added++;
+			} else if (!message.equals(alreadyFlagged.get(patientId))) {
+				flagService.deletePatientFlagForPatient(new Patient(patientId), flag);
+				flagService.savePatientFlag(new PatientFlag(new Patient(patientId), flag, message));
 			}
 		}
 
 		int removed = 0;
-		for (Integer patientId : alreadyFlagged) {
+		for (Integer patientId : alreadyFlagged.keySet()) {
 			if (!matching.contains(patientId)) {
 				flagService.deletePatientFlagForPatient(new Patient(patientId), flag);
 				removed++;
@@ -93,27 +96,27 @@ public class PatientFlagRefreshTask extends AbstractTask {
 		return patientIds;
 	}
 
-	Set<Integer> alreadyFlagged(Flag flag) {
-		return flaggedPatientIds(flag);
+	Map<Integer, String> alreadyFlagged(Flag flag) {
+		return flaggedMessages(flag);
 	}
 
 	/**
 	 * Reads a flag's unvoided rows directly, as FlagService cannot list a flag's patients.
 	 * A voided row must not count, or the flag is never raised again for that patient.
 	 */
-	static Set<Integer> flaggedPatientIds(Flag flag) {
-		Set<Integer> patientIds = new HashSet<Integer>();
+	static Map<Integer, String> flaggedMessages(Flag flag) {
+		Map<Integer, String> messages = new HashMap<Integer, String>();
 		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
-		    "select patient_id from patientflags_patient_flag where flag_id = " + flag.getFlagId() + " and voided = false",
-		    true);
+		    "select patient_id, message from patientflags_patient_flag where flag_id = " + flag.getFlagId()
+		            + " and voided = false", true);
 		if (rows != null) {
 			for (List<Object> row : rows) {
 				if (row != null && !row.isEmpty() && row.get(0) != null) {
-					patientIds.add(((Number) row.get(0)).intValue());
+					messages.put(((Number) row.get(0)).intValue(), (String) row.get(1));
 				}
 			}
 		}
-		return patientIds;
+		return messages;
 	}
 
 	/**
