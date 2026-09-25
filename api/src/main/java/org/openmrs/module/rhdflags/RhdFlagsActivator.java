@@ -28,9 +28,11 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 	
 	public static final String REFRESH_TASK_NAME = "RHD Patient Flag Refresh";
 	
-	public static final String INTERVAL_PROPERTY = "rhdflags.refreshIntervalSeconds";
-	
-	private static final long DEFAULT_INTERVAL_SECONDS = 86400L;
+	/**
+	 * The scheduler owns the interval once the task exists, so this is only the value the task is first
+	 * registered with. Change it afterwards in Manage Scheduler.
+	 */
+	private static final long REFRESH_INTERVAL_SECONDS = 86400L;
 	
 	private static final Logger log = LoggerFactory.getLogger(RhdFlagsActivator.class);
 	
@@ -55,7 +57,7 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 			task.setDescription(description);
 			task.setTaskClass(taskClass);
 			task.setStartTime(new Date());
-			task.setRepeatInterval(intervalSeconds());
+			task.setRepeatInterval(REFRESH_INTERVAL_SECONDS);
 			task.setStartOnStartup(Boolean.TRUE);
 			task.setStarted(Boolean.TRUE);
 			
@@ -68,19 +70,6 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 			// distribution down with it on a machine where the scheduler is unavailable.
 			log.error("Could not schedule '{}'", name, e);
 		}
-	}
-	
-	private Long intervalSeconds() {
-		String configured = Context.getAdministrationService().getGlobalProperty(INTERVAL_PROPERTY);
-		if (configured != null && !configured.trim().isEmpty()) {
-			try {
-				return Long.valueOf(configured.trim());
-			}
-			catch (NumberFormatException e) {
-				log.warn("{} is not a number, using {}s", INTERVAL_PROPERTY, DEFAULT_INTERVAL_SECONDS);
-			}
-		}
-		return DEFAULT_INTERVAL_SECONDS;
 	}
 	
 	@Override

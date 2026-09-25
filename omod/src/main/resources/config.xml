@@ -31,17 +31,6 @@
   </require_modules>
 
   <globalProperty>
-    <property>rhdflags.refreshIntervalSeconds</property>
-    <defaultValue>86400</defaultValue>
-    <description>
-      How often the scheduled task runs, in seconds. Read only when the task is first registered,
-      because after that the interval belongs to the scheduler and overwriting it here would
-      discard whatever an administrator set in Manage Scheduler. To change it on a running
-      instance, edit the task there.
-    </description>
-  </globalProperty>
-
-  <globalProperty>
     <property>rhdflags.listFlagTag</property>
     <defaultValue></defaultValue>
     <description>
