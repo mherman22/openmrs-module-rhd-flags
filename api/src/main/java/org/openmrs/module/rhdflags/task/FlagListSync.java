@@ -73,7 +73,7 @@ public class FlagListSync {
 
 		CohortM list = cohortService.getCohortMByUuid(flag.getUuid());
 		if (list == null) {
-			// Recreating a list someone voided would collide with its uuid, and would undo their choice.
+			// Don't recreate a list someone voided: its uuid still exists.
 			if (!listed || listWasVoided(flag)) {
 				return;
 			}
@@ -126,9 +126,6 @@ public class FlagListSync {
 		}
 	}
 
-	/**
-	 * Whether following each list in the way to the name its flag now has leads back to this list.
-	 */
 	private boolean inRenameCycle(CohortService cohortService, CohortM holder, CohortM list) {
 		FlagService flagService = Context.getService(FlagService.class);
 		Set<String> seen = new HashSet<String>();
