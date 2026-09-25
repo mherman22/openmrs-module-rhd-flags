@@ -93,9 +93,9 @@ public class FlagListSync {
 				list.setName(flag.getName());
 				list.setDescription(description(flag));
 				cohortService.saveCohortM(list);
-			} else if (willMove(cohortService, holder, list)) {
-				// Stepping aside frees this list's old name for the list in its way, as when two
-				// flags swap names, and a later run takes the new one.
+			} else if (inRenameCycle(cohortService, holder, list)) {
+				// Flags that swap or rotate names block each other's lists for good unless one of
+				// them steps aside, freeing its old name for the next in the cycle.
 				list.setName(flag.getName() + " (" + flag.getUuid() + ")");
 				cohortService.saveCohortM(list);
 			} else {
@@ -137,10 +137,9 @@ public class FlagListSync {
 	}
 
 	/**
-	 * Whether the list in the way is itself being renamed onto a name that is free, or that this
-	 * list holds, following any lists in the way of that rename in turn.
+	 * Whether following each list in the way to the name its flag now has leads back to this list.
 	 */
-	private boolean willMove(CohortService cohortService, CohortM holder, CohortM list) {
+	private boolean inRenameCycle(CohortService cohortService, CohortM holder, CohortM list) {
 		FlagService flagService = Context.getService(FlagService.class);
 		Set<String> seen = new HashSet<String>();
 		while (seen.add(holder.getUuid())) {
@@ -149,7 +148,10 @@ public class FlagListSync {
 				return false;
 			}
 			CohortM next = cohortService.getCohortM(owner.getName());
-			if (next == null || next.getUuid().equals(list.getUuid())) {
+			if (next == null) {
+				return false;
+			}
+			if (next.getUuid().equals(list.getUuid())) {
 				return true;
 			}
 			holder = next;

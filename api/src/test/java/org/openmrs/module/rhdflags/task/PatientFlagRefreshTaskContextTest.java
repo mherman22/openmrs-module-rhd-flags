@@ -169,11 +169,16 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 
 		rename(second, "lost to follow-up");
 		rename(first, "follow-up due");
+		first = flagService.getFlag(first.getFlagId());
+		first.setCriteria("select patient_id from patient where patient_id in (" + MATCHING_PATIENT + ", "
+		        + OTHER_PATIENT + ")");
+		flagService.saveFlag(first);
 		runScheduledWork();
 		runScheduledWork();
 
 		assertEquals(1, listsNamed("overdue"));
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
+		assertEquals(1, activeMembers("overdue", OTHER_PATIENT));
 	}
 
 	@Test
