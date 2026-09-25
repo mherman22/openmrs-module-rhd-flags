@@ -24,10 +24,11 @@ import org.slf4j.LoggerFactory;
  * on clinical writes, so a criterion that becomes true purely because time passed never fires
  * on its own. This runs on the scheduler to close that gap.
  *
- * Both of the module's own generation paths delete a flag's rows before rebuilding them, which
- * resets date_created on rows whose patient never stopped matching. This adds and removes only
- * what changed, so a row's date_created keeps meaning the time the patient started matching and
- * callers can report how long a flag has been raised.
+ * This adds and removes only what changed, so it never resets date_created itself. The
+ * patientflags module still does: its AOP advice deletes and re-inserts a patient's rows on every
+ * clinical write, so date_created does not say how long a flag has been raised.
+ *
+ * The flag lists are synced at the end of each run, so they reflect the rows just written.
  */
 public class PatientFlagRefreshTask extends AbstractTask {
 
@@ -35,14 +36,6 @@ public class PatientFlagRefreshTask extends AbstractTask {
 
 	@Override
 	public void execute() {
-		// The scheduler runs tasks as the user named in the scheduler.username global property,
-		// so there is nothing to log in here; without that session there is no privilege to read
-		// patients and a half-run refresh would clear flags it could not re-derive.
-		if (!Context.isAuthenticated()) {
-			log.warn("Skipping patient flag refresh: the scheduler session is not authenticated");
-			return;
-		}
-
 		FlagService flagService = Context.getService(FlagService.class);
 		int added = 0;
 		int removed = 0;
@@ -63,6 +56,8 @@ public class PatientFlagRefreshTask extends AbstractTask {
 		}
 
 		log.info("Patient flag refresh complete: {} raised, {} cleared", added, removed);
+
+		new FlagListSync().syncAll();
 	}
 
 	int[] reconcile(FlagService flagService, Flag flag) {
@@ -106,12 +101,14 @@ public class PatientFlagRefreshTask extends AbstractTask {
 
 	/**
 	 * FlagService can read a patient's flags but not a flag's patients, so this reads the rows
-	 * directly. The id is an Integer from the flag itself, so it cannot carry a quote.
+	 * directly. The id is an Integer from the flag itself, so it cannot carry a quote. Voided rows
+	 * are skipped because patientflags' own delete skips them too.
 	 */
 	Set<Integer> alreadyFlagged(Flag flag) {
 		Set<Integer> patientIds = new HashSet<Integer>();
 		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
-		    "select patient_id from patientflags_patient_flag where flag_id = " + flag.getFlagId(), true);
+		    "select patient_id from patientflags_patient_flag where flag_id = " + flag.getFlagId() + " and voided = 0",
+		    true);
 		if (rows != null) {
 			for (List<Object> row : rows) {
 				if (row != null && !row.isEmpty() && row.get(0) != null) {

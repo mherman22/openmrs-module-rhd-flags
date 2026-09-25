@@ -16,33 +16,42 @@ The module also ships a `PatientFlagTask`, but it is a `DaemonToken` runnable ra
 `org.openmrs.scheduler.Task`, so it cannot be registered with the scheduler, and its admin
 rebuild page sits behind CSRFGuard so it cannot be driven from a script.
 
-## Tasks
+## Task
 
-**RHD Patient Flag Refresh** re-evaluates every enabled flag and writes only the difference.
+**RHD Patient Flag Refresh** re-evaluates every enabled flag and writes only the difference, then
+mirrors each flag into a patient list of the same name.
 
-This matters beyond scheduling. Both of patientflags' own generation paths delete a flag's rows
-before rebuilding them, so `date_created` on a row whose patient never stopped matching is reset
-on every evaluation, including on ordinary clinical writes. Anything reporting how long a flag
-has been raised is therefore wrong. This task adds and removes only what changed, so a row's
-`date_created` keeps meaning the time that patient started matching.
+Writing only the difference means this task never resets a row's `date_created`. patientflags
+itself still does: its AOP advice deletes and re-inserts a patient's rows on every clinical write,
+and saving a flag rebuilds all of that flag's rows. So `date_created` is not a record of how long a
+flag has been raised.
 
-**RHD Flag List Sync** mirrors each flag into a patient list of the same name, creating the list
-if it is missing. Membership comes from the flags already evaluated rather than from re-running
-the criteria, so a list and the patient chart never disagree.
+A row keeps the message it was written with while its patient keeps matching. A SQL flag whose
+message uses `${n}` placeholders therefore shows the values from the day it was raised, until
+patientflags rewrites the row on the patient's next clinical write.
+
+Voided patient flag rows are ignored: a patient counts as flagged only through a live row.
+
+Each list carries its flag's uuid, so a rename renames the list, and a cohort someone made by hand
+under the same name is left alone (the cohort module rejects the duplicate name, so that flag gets
+no list until one of the two is renamed). A flag that is disabled, retired or no longer tagged
+keeps its list with every membership ended. A list someone voided stays voided. Membership comes
+from the flags already evaluated rather than from re-running the criteria, so a list and the
+patient chart never disagree.
 
 Removal end-dates a membership rather than voiding it. The cohort module counts a voided row when
 it rejects a duplicate, so a voided member could never rejoin the list.
 
-Both tasks register themselves with the scheduler on first start, because Initializer has no
-domain for `scheduler_task_config`.
+The task registers itself with the scheduler on first start, because Initializer has no domain for
+`scheduler_task_config`.
 
 ## Configuration
 
 | global property | default | meaning |
 | --- | --- | --- |
-| `rhdflags.refreshIntervalSeconds` | `86400` | how often both tasks run |
+| `rhdflags.refreshIntervalSeconds` | `86400` | how often the task runs |
 | `rhdflags.listFlagTag` | empty | only give a list to flags carrying this tag; empty means all |
-| `rhdflags.listCohortType` | `System List` | cohort type for lists this module creates |
+| `rhdflags.listCohortType` | `System List` | cohort type for lists this module creates; created if missing |
 
 The interval is read when a task is first registered. Change it afterwards in
 **Administration > Manage Scheduler**.

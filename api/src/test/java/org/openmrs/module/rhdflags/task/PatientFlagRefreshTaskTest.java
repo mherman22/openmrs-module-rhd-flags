@@ -87,8 +87,7 @@ public class PatientFlagRefreshTaskTest {
 	}
 
 	/**
-	 * The point of the task. Rewriting a row that did not change would reset its date_created
-	 * and lose how long the flag has been raised.
+	 * Rewriting a row that did not change would reset its date_created.
 	 */
 	@Test
 	public void leavesAPatientThatStillMatchesUntouched() {

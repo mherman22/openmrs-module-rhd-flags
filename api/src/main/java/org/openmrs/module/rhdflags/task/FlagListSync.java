@@ -1,6 +1,7 @@
 package org.openmrs.module.rhdflags.task;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -18,7 +19,6 @@ import org.openmrs.module.cohort.api.CohortService;
 import org.openmrs.module.cohort.api.CohortTypeService;
 import org.openmrs.module.patientflags.Flag;
 import org.openmrs.module.patientflags.api.FlagService;
-import org.openmrs.scheduler.tasks.AbstractTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,10 +29,11 @@ import org.slf4j.LoggerFactory;
  * if something keeps the two in step. Membership is taken from the flags the module has already
  * evaluated rather than from the criteria, so a list and the patient chart never disagree.
  *
- * Limit which flags get a list with the rhdflags.listFlagTag global property. An empty value
- * gives every enabled flag a list.
+ * A list shares its flag's uuid, so it follows the flag through a rename and a cohort someone
+ * made by hand under the same name is never touched. A flag that is disabled, retired or missing
+ * the rhdflags.listFlagTag tag keeps its list, emptied.
  */
-public class FlagListSyncTask extends AbstractTask {
+public class FlagListSync {
 
 	public static final String TAG_PROPERTY = "rhdflags.listFlagTag";
 
@@ -40,27 +41,17 @@ public class FlagListSyncTask extends AbstractTask {
 
 	private static final String DEFAULT_COHORT_TYPE = "System List";
 
-	private static final Logger log = LoggerFactory.getLogger(FlagListSyncTask.class);
+	private static final Logger log = LoggerFactory.getLogger(FlagListSync.class);
 
-	@Override
-	public void execute() {
-		if (!Context.isAuthenticated()) {
-			log.warn("Skipping flag list sync: the scheduler session is not authenticated");
-			return;
-		}
-
+	public void syncAll() {
 		FlagService flagService = Context.getService(FlagService.class);
 		String requiredTag = Context.getAdministrationService().getGlobalProperty(TAG_PROPERTY);
 
 		for (Flag flag : flagService.getAllFlags()) {
-			if (!Boolean.TRUE.equals(flag.getEnabled()) || Boolean.TRUE.equals(flag.getRetired())) {
-				continue;
-			}
-			if (!carriesTag(flag, requiredTag)) {
-				continue;
-			}
+			boolean listed = Boolean.TRUE.equals(flag.getEnabled()) && !Boolean.TRUE.equals(flag.getRetired())
+			        && carriesTag(flag, requiredTag);
 			try {
-				sync(flag);
+				sync(flag, listed);
 			}
 			catch (Exception e) {
 				log.error("Could not sync the list for flag '{}'", flag.getName(), e);
@@ -83,16 +74,24 @@ public class FlagListSyncTask extends AbstractTask {
 		return false;
 	}
 
-	void sync(Flag flag) {
+	void sync(Flag flag, boolean listed) {
 		CohortService cohortService = Context.getService(CohortService.class);
 		CohortMemberService memberService = Context.getService(CohortMemberService.class);
 
-		CohortM list = cohortService.getCohortM(flag.getName());
+		CohortM list = cohortService.getCohortMByUuid(flag.getUuid());
 		if (list == null) {
+			// Recreating a list someone voided would collide with its uuid, and would undo their choice.
+			if (!listed || listWasVoided(flag)) {
+				return;
+			}
 			list = createList(cohortService, flag);
+		} else if (!flag.getName().equals(list.getName())) {
+			list.setName(flag.getName());
+			list.setDescription(description(flag));
+			cohortService.saveCohortM(list);
 		}
 
-		Set<Integer> flagged = flaggedPatientIds(flag);
+		Set<Integer> flagged = listed ? flaggedPatientIds(flag) : Collections.<Integer> emptySet();
 		Map<Integer, CohortMember> active = activeMembers(memberService, list);
 
 		int added = 0;
@@ -126,12 +125,26 @@ public class FlagListSyncTask extends AbstractTask {
 
 	private CohortM createList(CohortService cohortService, Flag flag) {
 		CohortM list = new CohortM();
+		list.setUuid(flag.getUuid());
 		list.setName(flag.getName());
-		list.setDescription("Patients currently flagged: " + flag.getName());
+		list.setDescription(description(flag));
 		list.setGroupCohort(Boolean.FALSE);
 		list.setCohortType(cohortType());
 		log.info("Creating list '{}'", flag.getName());
 		return cohortService.saveCohortM(list);
+	}
+
+	private String description(Flag flag) {
+		return "Patients currently flagged: " + flag.getName();
+	}
+
+	/**
+	 * CohortService only finds unvoided cohorts by uuid, so a voided list is visible only here.
+	 */
+	private boolean listWasVoided(Flag flag) {
+		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
+		    "select count(*) from cohort where uuid = '" + flag.getUuid().replace("'", "''") + "'", true);
+		return ((Number) rows.get(0).get(0)).intValue() > 0;
 	}
 
 	private CohortType cohortType() {
@@ -143,7 +156,11 @@ public class FlagListSyncTask extends AbstractTask {
 				return type;
 			}
 		}
-		throw new IllegalStateException("No cohort type named '" + wanted + "'");
+		CohortType type = new CohortType();
+		type.setName(wanted);
+		type.setDescription("Patient lists kept in step with patient flags");
+		log.info("Creating cohort type '{}'", wanted);
+		return cohortTypeService.saveCohortType(type);
 	}
 
 	private Map<Integer, CohortMember> activeMembers(CohortMemberService memberService, CohortM list) {
@@ -166,7 +183,8 @@ public class FlagListSyncTask extends AbstractTask {
 	private Set<Integer> flaggedPatientIds(Flag flag) {
 		Set<Integer> patientIds = new HashSet<Integer>();
 		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
-		    "select patient_id from patientflags_patient_flag where flag_id = " + flag.getFlagId(), true);
+		    "select patient_id from patientflags_patient_flag where flag_id = " + flag.getFlagId() + " and voided = 0",
+		    true);
 		if (rows != null) {
 			for (List<Object> row : rows) {
 				if (row != null && !row.isEmpty() && row.get(0) != null) {

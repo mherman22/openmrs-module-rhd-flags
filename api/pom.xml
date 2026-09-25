@@ -27,6 +27,18 @@
       <artifactId>cohort-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.openmrs.api</groupId>
+      <artifactId>openmrs-api</artifactId>
+      <version>${openmrsPlatformVersion}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.test</groupId>
+      <artifactId>openmrs-test</artifactId>
+      <type>pom</type>
+    </dependency>
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>4.13.2</version>
