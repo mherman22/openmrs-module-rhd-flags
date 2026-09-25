@@ -161,6 +161,22 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 	}
 
 	@Test
+	public void waitsForTheListInItsWayRatherThanTakingAStandInName() {
+		Flag first = saveFlag("alpha", MATCHES_ONE);
+		Flag second = saveFlag("beta", "select patient_id from patient where patient_id = " + OTHER_PATIENT);
+		runScheduledWork();
+
+		rename(second, "gamma");
+		rename(first, "beta");
+		runScheduledWork();
+		assertEquals(0, count("select count(*) from cohort where name like '%(%'"));
+		runScheduledWork();
+
+		assertEquals(1, activeMembers("beta", MATCHING_PATIENT));
+		assertEquals(1, activeMembers("gamma", OTHER_PATIENT));
+	}
+
+	@Test
 	public void keepsItsNameWhenTheListInItsWayIsStuckBehindAHandMadeOne() {
 		saveHandMadeList("lost to follow-up", OTHER_PATIENT);
 		Flag first = saveFlag("overdue", MATCHES_ONE);
