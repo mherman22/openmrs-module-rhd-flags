@@ -183,7 +183,7 @@ public class FlagListSync {
 	private Set<Integer> flaggedPatientIds(Flag flag) {
 		Set<Integer> patientIds = new HashSet<Integer>();
 		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
-		    "select patient_id from patientflags_patient_flag where flag_id = " + flag.getFlagId() + " and voided = 0",
+		    "select patient_id from patientflags_patient_flag where flag_id = " + flag.getFlagId() + " and voided = false",
 		    true);
 		if (rows != null) {
 			for (List<Object> row : rows) {

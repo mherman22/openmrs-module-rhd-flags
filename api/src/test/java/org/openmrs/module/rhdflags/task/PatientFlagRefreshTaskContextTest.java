@@ -3,6 +3,8 @@ package org.openmrs.module.rhdflags.task;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 
 import org.junit.Before;
@@ -17,6 +19,7 @@ import org.openmrs.module.cohort.api.CohortService;
 import org.openmrs.module.cohort.api.CohortTypeService;
 import org.openmrs.module.patientflags.Flag;
 import org.openmrs.module.patientflags.PatientFlag;
+import org.openmrs.module.patientflags.Tag;
 import org.openmrs.module.patientflags.api.FlagService;
 import org.openmrs.module.patientflags.evaluator.SQLFlagEvaluator;
 import org.openmrs.test.BaseModuleContextSensitiveTest;
@@ -47,7 +50,7 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		runScheduledWork();
 
 		assertEquals(1, count("select count(*) from patientflags_patient_flag where flag_id = " + flag.getFlagId()
-		        + " and voided = 1"));
+		        + " and voided = true"));
 		assertEquals(0, activeMembers("dismissed", MATCHING_PATIENT));
 	}
 
@@ -59,7 +62,7 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		runScheduledWork();
 
 		assertEquals(1, count("select count(*) from patientflags_patient_flag where flag_id = " + flag.getFlagId()
-		        + " and patient_id = " + MATCHING_PATIENT + " and voided = 0"));
+		        + " and patient_id = " + MATCHING_PATIENT + " and voided = false"));
 	}
 
 	@Test
@@ -79,6 +82,25 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
 
 		flag.setEnabled(Boolean.FALSE);
+		flagService.saveFlag(flag);
+		runScheduledWork();
+
+		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
+	}
+
+	@Test
+	public void endsTheListOfAFlagThatNoLongerCarriesTheListTag() {
+		Tag tag = new Tag();
+		tag.setName("worklist");
+		flagService.saveTag(tag);
+		Context.getAdministrationService().saveGlobalProperty(new GlobalProperty("rhdflags.listFlagTag", "worklist"));
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		flag.setTags(new HashSet<Tag>(Collections.singleton(tag)));
+		flagService.saveFlag(flag);
+		runScheduledWork();
+		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
+
+		flag.getTags().clear();
 		flagService.saveFlag(flag);
 		runScheduledWork();
 
@@ -174,12 +196,12 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 
 	private long activeMembers(String listName, int patientId) {
 		return count("select count(*) from cohort_member m join cohort c on c.cohort_id = m.cohort_id where c.name = '"
-		        + listName + "' and c.voided = 0 and m.patient_id = " + patientId
-		        + " and m.end_date is null and m.voided = 0");
+		        + listName + "' and c.voided = false and m.patient_id = " + patientId
+		        + " and m.end_date is null and m.voided = false");
 	}
 
 	private long listsNamed(String name) {
-		return count("select count(*) from cohort where voided = 0 and name = '" + name + "'");
+		return count("select count(*) from cohort where voided = false and name = '" + name + "'");
 	}
 
 	private long count(String sql) {
