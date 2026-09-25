@@ -3,10 +3,19 @@ package org.openmrs.module.rhdflags.task;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.UUID;
+
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Property;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -257,9 +266,56 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		CohortService cohortService = Context.getService(CohortService.class);
 		cohortService.voidCohortM(cohortService.getCohortM("overdue"), "not wanted");
 
+		assertEquals(0, errorsLoggedDuringScheduledWork());
+		assertEquals(1, count("select count(*) from cohort where name = 'overdue'"));
+		assertEquals(0, listsNamed("overdue"));
+	}
+
+	@Test
+	public void restoresThePurgedListOfAFlagRecreatedUnderItsUuid() {
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+		purge(flag);
 		runScheduledWork();
 
-		assertEquals(1, count("select count(*) from cohort where name = 'overdue'"));
+		saveFlag("overdue", MATCHES_ONE, flag.getUuid());
+		runScheduledWork();
+		runScheduledWork();
+
+		assertEquals(1, listsNamed("overdue"));
+		assertEquals(1, activeMembersOfList(flag.getUuid(), MATCHING_PATIENT));
+		assertEquals(1, count("select count(*) from cohort_attribute"));
+	}
+
+	@Test
+	public void restoresThePurgedListOfAFlagRecreatedUnderItsUuidWithANewName() {
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+		purge(flag);
+		runScheduledWork();
+
+		saveFlag("prophylaxis overdue", MATCHES_ONE, flag.getUuid());
+		runScheduledWork();
+
+		assertEquals(0, count("select count(*) from cohort where voided = false and name = 'overdue'"));
+		assertEquals(1, activeMembers("prophylaxis overdue", MATCHING_PATIENT));
+	}
+
+	@Test
+	public void keepsAPurgedListVoidedWhileAHandMadeListHoldsTheRecreatedFlagsName() {
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+		purge(flag);
+		runScheduledWork();
+		saveHandMadeList("prophylaxis overdue", OTHER_PATIENT);
+
+		saveFlag("prophylaxis overdue", MATCHES_ONE, flag.getUuid());
+		runScheduledWork();
+
+		assertEquals(0, listsNamed("overdue"));
+		assertEquals(1, listsNamed("prophylaxis overdue"));
+		assertEquals(1, activeMembers("prophylaxis overdue", OTHER_PATIENT));
+		assertEquals(0, activeMembers("prophylaxis overdue", MATCHING_PATIENT));
 	}
 
 	@Test
@@ -332,8 +388,40 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		new PatientFlagRefreshTask().execute();
 	}
 
+	private int errorsLoggedDuringScheduledWork() {
+		final List<LogEvent> errors = new ArrayList<LogEvent>();
+		AbstractAppender appender = new AbstractAppender("errors", null, null, true, Property.EMPTY_ARRAY) {
+
+			@Override
+			public void append(LogEvent event) {
+				if (event.getLevel().isMoreSpecificThan(Level.ERROR)) {
+					errors.add(event);
+				}
+			}
+		};
+		appender.start();
+		Logger logger = (Logger) LogManager.getLogger(FlagListSync.class);
+		Level level = logger.getLevel();
+		logger.addAppender(appender);
+		// The test log4j2.xml turns every logger off.
+		logger.setLevel(Level.ERROR);
+		try {
+			runScheduledWork();
+		}
+		finally {
+			logger.removeAppender(appender);
+			logger.setLevel(level);
+		}
+		return errors.size();
+	}
+
 	private Flag saveFlag(String name, String criteria) {
+		return saveFlag(name, criteria, UUID.randomUUID().toString());
+	}
+
+	private Flag saveFlag(String name, String criteria, String uuid) {
 		Flag flag = new Flag();
+		flag.setUuid(uuid);
 		flag.setName(name);
 		flag.setCriteria(criteria);
 		flag.setEvaluator(SQLFlagEvaluator.class.getName());

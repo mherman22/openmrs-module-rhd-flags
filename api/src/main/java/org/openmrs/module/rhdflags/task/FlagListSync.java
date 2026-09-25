@@ -40,6 +40,8 @@ public class FlagListSync {
 	// Marks the module's lists, so one whose flag was purged can be told from a hand-made cohort.
 	private static final String MARKER_TYPE_UUID = "11b3c2f6-b196-4476-8f2e-1f1147d6db31";
 
+	private static final String PURGED_REASON = "Its patient flag was purged";
+
 	private static final Logger log = LoggerFactory.getLogger(FlagListSync.class);
 
 	public void syncAll() {
@@ -53,12 +55,12 @@ public class FlagListSync {
 
 		// Before the flags, so a new flag can take a purged flag's list name in the same run.
 		CohortService cohortService = Context.getService(CohortService.class);
-		Set<String> marked = new HashSet<String>();
+		Map<String, CohortM> marked = new HashMap<String, CohortM>();
 		for (CohortAttribute marker : cohortService.findCohortAttributesByTypeUuid(MARKER_TYPE_UUID)) {
-			marked.add(marker.getValueReference());
+			marked.put(marker.getValueReference(), marker.getCohort());
 			if (!flagUuids.contains(marker.getValueReference())) {
 				// Voiding the list voids its memberships too.
-				cohortService.voidCohortM(marker.getCohort(), "Its patient flag was purged");
+				cohortService.voidCohortM(marker.getCohort(), PURGED_REASON);
 			}
 		}
 
@@ -66,7 +68,7 @@ public class FlagListSync {
 			boolean listed = Boolean.TRUE.equals(flag.getEnabled()) && !Boolean.TRUE.equals(flag.getRetired())
 			        && carriesTag(flag, requiredTag);
 			try {
-				sync(flag, listed, marked.contains(flag.getUuid()));
+				sync(flag, listed, marked.get(flag.getUuid()));
 			}
 			catch (Exception e) {
 				log.error("Could not sync the list for flag '{}'", flag.getName(), e);
@@ -89,16 +91,32 @@ public class FlagListSync {
 		return false;
 	}
 
-	void sync(Flag flag, boolean listed, boolean marked) {
+	void sync(Flag flag, boolean listed, CohortM marked) {
 		CohortService cohortService = Context.getService(CohortService.class);
 
 		CohortM list = cohortService.getCohortMByUuid(flag.getUuid());
 		if (list == null) {
-			// Don't recreate a list someone voided: its uuid still exists.
-			if (!listed || listWasVoided(flag)) {
+			if (!listed) {
 				return;
 			}
-			list = createList(cohortService, flag);
+			// Unvoid rather than create: a flag recreated under its uuid, as Initializer does, finds it taken.
+			if (marked != null && PURGED_REASON.equals(marked.getVoidReason())) {
+				// Check before unvoiding: a rejected save leaves the list unvoided for the next commit.
+				if (cohortService.getCohortM(flag.getName()) != null) {
+					log.warn("List '{}' stays voided: another cohort is already called '{}'", marked.getName(),
+					    flag.getName());
+					return;
+				}
+				marked.setVoided(false);
+				marked.setName(flag.getName());
+				marked.setDescription(description(flag));
+				list = cohortService.saveCohortM(marked);
+			} else if (listWasVoided(flag)) {
+				// Don't recreate a list someone voided: its uuid still exists.
+				return;
+			} else {
+				list = createList(cohortService, flag);
+			}
 		} else if (!flag.getName().equals(list.getName())) {
 			// Check before setName: a rejected save leaves the name dirty for the next commit to write.
 			CohortM holder = cohortService.getCohortM(flag.getName());
@@ -116,7 +134,7 @@ public class FlagListSync {
 			}
 		}
 
-		if (!marked) {
+		if (marked == null) {
 			mark(cohortService, list, flag);
 		}
 

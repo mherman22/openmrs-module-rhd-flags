@@ -39,8 +39,10 @@ flags swap or rotate names, one list steps aside to a temporary name so the othe
 flag swap settles within two runs, and a longer rotation takes more. A flag that is disabled,
 retired or no longer tagged keeps its list with every membership ended. A flag that is deleted has
 its list voided, memberships included; a `Source patient flag` cohort attribute holding the flag's
-uuid marks the lists this module made, so a hand-made cohort is never voided. A list someone voided
-stays voided. Membership comes from the live flag rows rather than from re-running the criteria.
+uuid marks the lists this module made, so a hand-made cohort is never voided. A flag recreated under
+the deleted flag's uuid, as Initializer does, gets that list back with the flag's current patients,
+unless another cohort already holds the flag's name. A list someone voided stays voided. Membership
+comes from the live flag rows rather than from re-running the criteria.
 
 Removal from a list that is kept end-dates a membership rather than voiding it, because the cohort
 module's REST resource counts a voided row when it rejects a duplicate.
