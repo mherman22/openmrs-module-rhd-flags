@@ -12,11 +12,11 @@
   </description>
 
   <activator>org.openmrs.module.rhdflags.RhdFlagsActivator</activator>
-  <require_version>2.4.0</require_version>
+  <require_version>${openmrsPlatformVersion}</require_version>
 
   <require_modules>
-    <require_module version="3.0.10">org.openmrs.module.patientflags</require_module>
-    <require_module version="3.7.3">org.openmrs.module.cohort</require_module>
+    <require_module version="${patientflagsVersion}">org.openmrs.module.patientflags</require_module>
+    <require_module version="${cohortVersion}">org.openmrs.module.cohort</require_module>
   </require_modules>
 
   <globalProperty>
