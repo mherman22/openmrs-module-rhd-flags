@@ -141,6 +141,26 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 	}
 
 	@Test
+	public void listsFollowTwoFlagsThatSwapNames() {
+		Flag first = saveFlag("overdue", MATCHES_ONE);
+		Flag second = saveFlag("lost to follow-up", "select patient_id from patient where patient_id = " + OTHER_PATIENT);
+		runScheduledWork();
+
+		rename(first, "swapping");
+		rename(second, "overdue");
+		rename(first, "lost to follow-up");
+		runScheduledWork();
+		runScheduledWork();
+
+		assertEquals(1, listsNamed("overdue"));
+		assertEquals(1, activeMembers("overdue", OTHER_PATIENT));
+		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
+		assertEquals(1, listsNamed("lost to follow-up"));
+		assertEquals(1, activeMembers("lost to follow-up", MATCHING_PATIENT));
+		assertEquals(0, activeMembers("lost to follow-up", OTHER_PATIENT));
+	}
+
+	@Test
 	public void leavesAHandMadeListWithTheFlagsNameAlone() {
 		saveHandMadeList("overdue", OTHER_PATIENT);
 		saveFlag("overdue", MATCHES_ONE);
@@ -219,6 +239,13 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		flag.setEnabled(Boolean.TRUE);
 		flagService.saveFlag(flag);
 		return flag;
+	}
+
+	private void rename(Flag flag, String name) {
+		Flag current = flagService.getFlag(flag.getFlagId());
+		current.setName(name);
+		flagService.saveFlag(current);
+		Context.flushSession();
 	}
 
 	private void saveHandMadeList(String name, int patientId) {

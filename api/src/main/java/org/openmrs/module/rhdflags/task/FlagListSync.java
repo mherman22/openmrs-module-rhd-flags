@@ -92,6 +92,11 @@ public class FlagListSync {
 				list.setName(flag.getName());
 				list.setDescription(description(flag));
 				cohortService.saveCohortM(list);
+			} else if (Context.getService(FlagService.class).getFlagByUuid(holder.getUuid()) != null) {
+				// Another flag's list holds the name, as when two flags swap names. Stepping aside
+				// frees this list's old name for that flag, and the next run takes the new one.
+				list.setName(flag.getName() + " (" + flag.getUuid() + ")");
+				cohortService.saveCohortM(list);
 			} else {
 				log.warn("List '{}' keeps its name: another cohort is already called '{}'", list.getName(),
 				    flag.getName());
