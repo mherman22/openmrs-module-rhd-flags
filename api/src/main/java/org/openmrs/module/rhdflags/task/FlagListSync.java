@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -86,12 +85,19 @@ public class FlagListSync {
 			}
 			list = createList(cohortService, flag);
 		} else if (!flag.getName().equals(list.getName())) {
-			list.setName(flag.getName());
-			list.setDescription(description(flag));
-			cohortService.saveCohortM(list);
+			// Checked before touching the list: a rejected save leaves the new name dirty in the
+			// session, and the next commit writes it anyway.
+			if (cohortService.getCohortM(flag.getName()) == null) {
+				list.setName(flag.getName());
+				list.setDescription(description(flag));
+				cohortService.saveCohortM(list);
+			} else {
+				log.warn("List '{}' keeps its name: another cohort is already called '{}'", list.getName(),
+				    flag.getName());
+			}
 		}
 
-		Set<Integer> flagged = listed ? flaggedPatientIds(flag) : Collections.<Integer> emptySet();
+		Set<Integer> flagged = listed ? PatientFlagRefreshTask.flaggedPatientIds(flag) : Collections.<Integer> emptySet();
 		Map<Integer, CohortMember> active = activeMembers(memberService, list);
 
 		int added = 0;
@@ -139,7 +145,7 @@ public class FlagListSync {
 	}
 
 	/**
-	 * CohortService only finds unvoided cohorts by uuid, so a voided list is visible only here.
+	 * The cohort module's CohortService only finds unvoided cohorts by uuid.
 	 */
 	private boolean listWasVoided(Flag flag) {
 		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
@@ -155,6 +161,9 @@ public class FlagListSync {
 			if (wanted.equalsIgnoreCase(type.getName())) {
 				return type;
 			}
+		}
+		if (cohortTypeService.getCohortTypeByName(wanted, true) != null) {
+			throw new IllegalStateException("The cohort type '" + wanted + "' has been voided");
 		}
 		CohortType type = new CohortType();
 		type.setName(wanted);
@@ -178,20 +187,5 @@ public class FlagListSync {
 			}
 		}
 		return active;
-	}
-
-	private Set<Integer> flaggedPatientIds(Flag flag) {
-		Set<Integer> patientIds = new HashSet<Integer>();
-		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
-		    "select patient_id from patientflags_patient_flag where flag_id = " + flag.getFlagId() + " and voided = false",
-		    true);
-		if (rows != null) {
-			for (List<Object> row : rows) {
-				if (row != null && !row.isEmpty() && row.get(0) != null) {
-					patientIds.add(((Number) row.get(0)).intValue());
-				}
-			}
-		}
-		return patientIds;
 	}
 }

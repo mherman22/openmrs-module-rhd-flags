@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 
@@ -81,6 +82,7 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		runScheduledWork();
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
 
+		flag = flagService.getFlag(flag.getFlagId());
 		flag.setEnabled(Boolean.FALSE);
 		flagService.saveFlag(flag);
 		runScheduledWork();
@@ -92,7 +94,9 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 	public void endsTheListOfAFlagThatHasBeenRetired() {
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
+		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
 
+		flag = flagService.getFlag(flag.getFlagId());
 		flag.setRetired(Boolean.TRUE);
 		flag.setRetireReason("replaced");
 		flagService.saveFlag(flag);
@@ -113,6 +117,7 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		runScheduledWork();
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
 
+		flag = flagService.getFlag(flag.getFlagId());
 		flag.getTags().clear();
 		flagService.saveFlag(flag);
 		runScheduledWork();
@@ -125,6 +130,7 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		Flag flag = saveFlag("overdue", MATCHES_ONE);
 		runScheduledWork();
 
+		flag = flagService.getFlag(flag.getFlagId());
 		flag.setName("prophylaxis overdue");
 		flagService.saveFlag(flag);
 		runScheduledWork();
@@ -136,21 +142,31 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 
 	@Test
 	public void leavesAHandMadeListWithTheFlagsNameAlone() {
-		CohortM handMade = new CohortM();
-		handMade.setName("overdue");
-		handMade.setDescription("kept by hand");
-		handMade.setCohortType(Context.getService(CohortTypeService.class).getCohortTypeByName("System List"));
-		Context.getService(CohortService.class).saveCohortM(handMade);
-		CohortMember member = new CohortMember();
-		member.setCohort(handMade);
-		member.setPatient(Context.getPatientService().getPatient(OTHER_PATIENT));
-		member.setStartDate(new java.util.Date());
-		Context.getService(CohortMemberService.class).saveCohortMember(member);
+		saveHandMadeList("overdue", OTHER_PATIENT);
 		saveFlag("overdue", MATCHES_ONE);
 
 		runScheduledWork();
 
+		assertEquals(1, listsNamed("overdue"));
 		assertEquals(1, activeMembers("overdue", OTHER_PATIENT));
+		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
+	}
+
+	@Test
+	public void keepsTheOldNameWhenARenameWouldTakeAHandMadeListsName() {
+		saveHandMadeList("prophylaxis overdue", OTHER_PATIENT);
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+
+		flag = flagService.getFlag(flag.getFlagId());
+		flag.setName("prophylaxis overdue");
+		flagService.saveFlag(flag);
+		runScheduledWork();
+
+		assertEquals(1, listsNamed("prophylaxis overdue"));
+		assertEquals(1, activeMembers("prophylaxis overdue", OTHER_PATIENT));
+		assertEquals(0, activeMembers("prophylaxis overdue", MATCHING_PATIENT));
+		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
 	}
 
 	@Test
@@ -163,6 +179,18 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 
 		assertNotNull(Context.getService(CohortTypeService.class).getCohortTypeByName("Flag Lists"));
 		assertEquals(1, activeMembers("overdue", MATCHING_PATIENT));
+	}
+
+	@Test
+	public void doesNotRecreateACohortTypeThatWasVoided() {
+		CohortTypeService cohortTypeService = Context.getService(CohortTypeService.class);
+		cohortTypeService.voidCohortType(cohortTypeService.getCohortTypeByName("System List"), "not wanted");
+		saveFlag("overdue", MATCHES_ONE);
+
+		runScheduledWork();
+
+		assertEquals(1, count("select count(*) from cohort_type where name = 'System List'"));
+		assertEquals(0, listsNamed("overdue"));
 	}
 
 	@Test
@@ -191,6 +219,19 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		flag.setEnabled(Boolean.TRUE);
 		flagService.saveFlag(flag);
 		return flag;
+	}
+
+	private void saveHandMadeList(String name, int patientId) {
+		CohortM handMade = new CohortM();
+		handMade.setName(name);
+		handMade.setDescription("kept by hand");
+		handMade.setCohortType(Context.getService(CohortTypeService.class).getCohortTypeByName("System List"));
+		Context.getService(CohortService.class).saveCohortM(handMade);
+		CohortMember member = new CohortMember();
+		member.setCohort(handMade);
+		member.setPatient(Context.getPatientService().getPatient(patientId));
+		member.setStartDate(new Date());
+		Context.getService(CohortMemberService.class).saveCohortMember(member);
 	}
 
 	private void voidedFlagFor(Flag flag) {

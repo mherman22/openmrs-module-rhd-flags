@@ -57,6 +57,10 @@ public class PatientFlagRefreshTask extends AbstractTask {
 
 		log.info("Patient flag refresh complete: {} raised, {} cleared", added, removed);
 
+		// Every row the refresh touched is still in the session, and each of the sync's commits
+		// would dirty-check them all.
+		Context.flushSession();
+		Context.clearSession();
 		new FlagListSync().syncAll();
 	}
 
@@ -99,12 +103,16 @@ public class PatientFlagRefreshTask extends AbstractTask {
 		return patientIds;
 	}
 
+	Set<Integer> alreadyFlagged(Flag flag) {
+		return flaggedPatientIds(flag);
+	}
+
 	/**
 	 * FlagService can read a patient's flags but not a flag's patients, so this reads the rows
-	 * directly. The id is an Integer from the flag itself, so it cannot carry a quote. Voided rows
-	 * are skipped because patientflags' own delete skips them too.
+	 * directly. The id is an Integer from the flag itself, so it cannot carry a quote. A voided row
+	 * does not count, so it never stops the flag being raised again.
 	 */
-	Set<Integer> alreadyFlagged(Flag flag) {
+	static Set<Integer> flaggedPatientIds(Flag flag) {
 		Set<Integer> patientIds = new HashSet<Integer>();
 		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
 		    "select patient_id from patientflags_patient_flag where flag_id = " + flag.getFlagId() + " and voided = false",
