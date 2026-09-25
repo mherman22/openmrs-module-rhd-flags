@@ -1,7 +1,53 @@
+# Maven build output
 target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Compiled output and packaging
+*.class
 *.omod
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# JVM crash and error logs
+hs_err_pid*
+replay_pid*
+*.log
+
+# IntelliJ
 .idea/
 *.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse
 .settings/
 .classpath
 .project
+.factorypath
+bin/
+
+# NetBeans
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# VS Code
+.vscode/
+
+# macOS and Windows
+.DS_Store
+Thumbs.db
