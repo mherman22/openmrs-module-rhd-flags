@@ -54,12 +54,23 @@ The task registers itself with the scheduler on first start, because Initializer
 
 | global property | default | meaning |
 | --- | --- | --- |
-| `rhdflags.refreshIntervalSeconds` | `86400` | how often the task runs |
 | `rhdflags.listFlagTag` | empty | only give a list to flags carrying this tag; empty means all |
 | `rhdflags.listCohortType` | `System List` | cohort type for lists this module creates; created if missing, unless a voided type has that name |
 
-The interval is read when a task is first registered. Change it afterwards in
-**Administration > Manage Scheduler**.
+The task runs once a day. The scheduler owns the interval once the task exists, so change it in
+**Administration > Manage Scheduler** rather than here.
+
+## Installing
+
+Build the module, then either drop the omod into the running instance:
+
+    cp omod/target/rhdflags-omod-*.omod /openmrs/data/modules/
+
+or, in a distribution, mount it alongside the other modules and restart the backend. Once it
+starts it registers its own scheduled task, so there is nothing to configure to get it running.
+
+Flags whose criteria have become true show up on the patient chart as usual, and each flag also
+appears under **Patient lists** as a list of the patients currently carrying it.
 
 ## Requirements
 
@@ -70,3 +81,7 @@ OpenMRS platform 2.4.0 or later, patientflags 3.0.10, cohort 3.7.3.
     mvn clean install
 
 The module is `omod/target/rhdflags-omod-*.omod`.
+
+## License
+
+[MPL 2.0 with the OpenMRS Healthcare Disclaimer](LICENSE).
