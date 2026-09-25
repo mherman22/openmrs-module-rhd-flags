@@ -18,16 +18,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Re-evaluates every enabled flag and writes only the difference.
- *
- * The patientflags module evaluates a flag when its definition is saved and through AOP advice
- * on clinical writes, so a criterion that becomes true purely because time passed never fires
- * on its own. This runs on the scheduler to close that gap.
- *
- * Both of the module's own generation paths delete a flag's rows before rebuilding them, which
- * resets date_created on rows whose patient never stopped matching. This adds and removes only
- * what changed, so a row's date_created keeps meaning the time the patient started matching and
- * callers can report how long a flag has been raised.
+ * Re-evaluates every enabled flag, writing only the rows that changed, then syncs the flag lists.
+ * patientflags evaluates only on writes, so without this a criterion that time makes true never fires.
  */
 public class PatientFlagRefreshTask extends AbstractTask {
 
@@ -35,14 +27,6 @@ public class PatientFlagRefreshTask extends AbstractTask {
 
 	@Override
 	public void execute() {
-		// The scheduler runs tasks as the user named in the scheduler.username global property,
-		// so there is nothing to log in here; without that session there is no privilege to read
-		// patients and a half-run refresh would clear flags it could not re-derive.
-		if (!Context.isAuthenticated()) {
-			log.warn("Skipping patient flag refresh: the scheduler session is not authenticated");
-			return;
-		}
-
 		FlagService flagService = Context.getService(FlagService.class);
 		int added = 0;
 		int removed = 0;
@@ -63,24 +47,32 @@ public class PatientFlagRefreshTask extends AbstractTask {
 		}
 
 		log.info("Patient flag refresh complete: {} raised, {} cleared", added, removed);
+
+		// Clear the refresh's rows first, or every commit the sync makes dirty-checks them all.
+		Context.flushSession();
+		Context.clearSession();
+		new FlagListSync().syncAll();
 	}
 
 	int[] reconcile(FlagService flagService, Flag flag) {
 		Map<Object, Object> evaluationContext = new HashMap<Object, Object>();
 		Set<Integer> matching = evaluate(flagService, flag, evaluationContext);
-		Set<Integer> alreadyFlagged = alreadyFlagged(flag);
+		Map<Integer, String> alreadyFlagged = alreadyFlagged(flag);
 
 		int added = 0;
 		for (Integer patientId : matching) {
-			if (!alreadyFlagged.contains(patientId)) {
-				flagService.savePatientFlag(new PatientFlag(new Patient(patientId), flag,
-				    message(flag, patientId, evaluationContext)));
+			String message = message(flag, patientId, evaluationContext);
+			if (!alreadyFlagged.containsKey(patientId)) {
+				flagService.savePatientFlag(new PatientFlag(new Patient(patientId), flag, message));
 				added++;
+			} else if (!message.equals(alreadyFlagged.get(patientId))) {
+				flagService.deletePatientFlagForPatient(new Patient(patientId), flag);
+				flagService.savePatientFlag(new PatientFlag(new Patient(patientId), flag, message));
 			}
 		}
 
 		int removed = 0;
-		for (Integer patientId : alreadyFlagged) {
+		for (Integer patientId : alreadyFlagged.keySet()) {
 			if (!matching.contains(patientId)) {
 				flagService.deletePatientFlagForPatient(new Patient(patientId), flag);
 				removed++;
@@ -104,22 +96,27 @@ public class PatientFlagRefreshTask extends AbstractTask {
 		return patientIds;
 	}
 
+	Map<Integer, String> alreadyFlagged(Flag flag) {
+		return flaggedMessages(flag);
+	}
+
 	/**
-	 * FlagService can read a patient's flags but not a flag's patients, so this reads the rows
-	 * directly. The id is an Integer from the flag itself, so it cannot carry a quote.
+	 * Reads a flag's unvoided rows directly, as FlagService cannot list a flag's patients.
+	 * A voided row must not count, or the flag is never raised again for that patient.
 	 */
-	Set<Integer> alreadyFlagged(Flag flag) {
-		Set<Integer> patientIds = new HashSet<Integer>();
+	static Map<Integer, String> flaggedMessages(Flag flag) {
+		Map<Integer, String> messages = new HashMap<Integer, String>();
 		List<List<Object>> rows = Context.getAdministrationService().executeSQL(
-		    "select patient_id from patientflags_patient_flag where flag_id = " + flag.getFlagId(), true);
+		    "select patient_id, message from patientflags_patient_flag where flag_id = " + flag.getFlagId()
+		            + " and voided = false", true);
 		if (rows != null) {
 			for (List<Object> row : rows) {
 				if (row != null && !row.isEmpty() && row.get(0) != null) {
-					patientIds.add(((Number) row.get(0)).intValue());
+					messages.put(((Number) row.get(0)).intValue(), (String) row.get(1));
 				}
 			}
 		}
-		return patientIds;
+		return messages;
 	}
 
 	/**

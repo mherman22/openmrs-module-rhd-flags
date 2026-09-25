@@ -4,7 +4,6 @@ import java.util.Date;
 
 import org.openmrs.api.context.Context;
 import org.openmrs.module.BaseModuleActivator;
-import org.openmrs.module.rhdflags.task.FlagListSyncTask;
 import org.openmrs.module.rhdflags.task.PatientFlagRefreshTask;
 import org.openmrs.scheduler.SchedulerService;
 import org.openmrs.scheduler.TaskDefinition;
@@ -22,8 +21,6 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 
 	public static final String REFRESH_TASK_NAME = "RHD Patient Flag Refresh";
 
-	public static final String LIST_SYNC_TASK_NAME = "RHD Flag List Sync";
-
 	public static final String INTERVAL_PROPERTY = "rhdflags.refreshIntervalSeconds";
 
 	private static final long DEFAULT_INTERVAL_SECONDS = 86400L;
@@ -32,16 +29,13 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 
 	@Override
 	public void started() {
-		// The list sync reads whatever the refresh last wrote, so it is offset by a minute to
-		// keep the lists a cycle behind the flags rather than a cycle ahead.
 		schedule(REFRESH_TASK_NAME, PatientFlagRefreshTask.class.getName(),
-		    "Re-evaluates patient flags whose criteria depend on the passage of time.", 0);
-		schedule(LIST_SYNC_TASK_NAME, FlagListSyncTask.class.getName(),
-		    "Mirrors each patient flag into a patient list of the same name.", 60);
+		    "Re-evaluates patient flags whose criteria depend on the passage of time, then mirrors each"
+		            + " flag into a patient list of the same name.");
 		log.info("RHD Flags module started");
 	}
 
-	private void schedule(String name, String taskClass, String description, int offsetSeconds) {
+	private void schedule(String name, String taskClass, String description) {
 		try {
 			SchedulerService schedulerService = Context.getSchedulerService();
 			if (schedulerService.getTaskByName(name) != null) {
@@ -53,7 +47,7 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 			task.setName(name);
 			task.setDescription(description);
 			task.setTaskClass(taskClass);
-			task.setStartTime(new Date(System.currentTimeMillis() + (offsetSeconds * 1000L)));
+			task.setStartTime(new Date());
 			task.setRepeatInterval(intervalSeconds());
 			task.setStartOnStartup(Boolean.TRUE);
 			task.setStarted(Boolean.TRUE);

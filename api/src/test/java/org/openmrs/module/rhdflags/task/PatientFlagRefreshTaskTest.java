@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -47,8 +48,12 @@ public class PatientFlagRefreshTaskTest {
 		task = new PatientFlagRefreshTask() {
 
 			@Override
-			Set<Integer> alreadyFlagged(Flag flag) {
-				return new LinkedHashSet<Integer>(alreadyFlagged);
+			Map<Integer, String> alreadyFlagged(Flag flag) {
+				Map<Integer, String> messages = new LinkedHashMap<Integer, String>();
+				for (Integer patientId : alreadyFlagged) {
+					messages.put(patientId, flag.getMessage());
+				}
+				return messages;
 			}
 		};
 	}
@@ -87,8 +92,7 @@ public class PatientFlagRefreshTaskTest {
 	}
 
 	/**
-	 * The point of the task. Rewriting a row that did not change would reset its date_created
-	 * and lose how long the flag has been raised.
+	 * Rewriting a row that did not change would reset its date_created.
 	 */
 	@Test
 	public void leavesAPatientThatStillMatchesUntouched() {
