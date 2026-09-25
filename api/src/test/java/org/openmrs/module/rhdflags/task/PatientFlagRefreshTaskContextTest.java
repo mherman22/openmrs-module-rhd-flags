@@ -97,6 +97,7 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		runScheduledWork();
 
 		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
+		assertEquals(1, listsNamed("overdue"));
 	}
 
 	@Test
@@ -112,6 +113,7 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		runScheduledWork();
 
 		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
+		assertEquals(1, listsNamed("overdue"));
 	}
 
 	@Test
@@ -132,6 +134,7 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		runScheduledWork();
 
 		assertEquals(0, activeMembers("overdue", MATCHING_PATIENT));
+		assertEquals(1, listsNamed("overdue"));
 	}
 
 	@Test
@@ -226,7 +229,7 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 
 		rename(second, "gamma");
 		rename(first, "beta");
-		runScheduledWork();
+		assertEquals(0, errorsLoggedDuringScheduledWork());
 		assertEquals(0, count("select count(*) from cohort where name like '%(%'"));
 		runScheduledWork();
 
