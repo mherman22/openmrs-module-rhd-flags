@@ -1,0 +1,7 @@
+target/
+*.omod
+.idea/
+*.iml
+.settings/
+.classpath
+.project
