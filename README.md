@@ -15,8 +15,8 @@ injection that is now overdue for its regimen interval, or a patient who has not
 fires until somebody happens to touch the patient for an unrelated reason.
 
 The module also ships a `PatientFlagTask`, but it is a `DaemonToken` runnable rather than an
-`org.openmrs.scheduler.Task`, so it cannot be registered with the scheduler, and its admin
-rebuild page sits behind CSRFGuard so it cannot be driven from a script.
+`org.openmrs.scheduler.Task`, so it cannot be registered with the scheduler, and from platform 2.6.0
+its admin rebuild page sits behind CSRFGuard so it cannot be driven from a script.
 
 ## What it does
 
@@ -40,10 +40,9 @@ Voided patient flag rows are ignored: a patient counts as flagged only through a
 
 ### Lists
 
-Membership comes from the live flag rows rather than from re-running the criteria, so a list and
-the patient chart never disagree. Removal from a list that is kept end-dates a membership rather
-than voiding it, because the cohort module's REST resource counts a voided row when it rejects a
-duplicate.
+Membership comes from the live flag rows rather than from re-running the criteria. Removal from a
+list that is kept end-dates a membership rather than voiding it, because the cohort module's REST
+resource counts a voided row when it rejects a duplicate.
 
 Each list carries its flag's uuid, so a rename renames the list, and a cohort someone made by hand
 under the same name is left alone (the cohort module rejects the duplicate name, so that flag gets
@@ -104,8 +103,9 @@ lists failed, and logs the cause of each at `error`. The platform's packaged `lo
 `org.openmrs` at `warn`, so those are the lines you get without configuring anything.
 
 For the rest, including which list changed and by how much, add `org.openmrs.module.rhdflags:info`
-to `log.level` under **Administration > Settings > Log**. The module applies its own entry at
-startup, because core reads that property only when it is saved on a running server.
+to `log.level` under **Administration > Settings > Log**, then restart. The module gives itself its
+own logger at startup, so the entry reaches only this module. On platform 2.4.0 to 2.4.3 and 2.5.0,
+core applies the entry to `org.openmrs` as a whole, which the module cannot prevent.
 
 ## Building
 

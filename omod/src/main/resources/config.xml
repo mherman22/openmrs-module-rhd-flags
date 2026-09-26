@@ -19,7 +19,7 @@
   <package>org.openmrs.module.rhdflags</package>
   <author>UW DIGI</author>
   <description>
-    Scheduled re-evaluation of patient flags whose criteria depend on the passage of time.
+    Scheduled re-evaluation of every enabled patient flag, mirrored into patient lists.
   </description>
 
   <activator>org.openmrs.module.rhdflags.RhdFlagsActivator</activator>

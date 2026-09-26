@@ -86,7 +86,7 @@ public class FlagListSync {
 		Map<String, CohortM> marked = new HashMap<String, CohortM>();
 		for (CohortAttribute marker : cohortService.findCohortAttributesByTypeUuid(MARKER_TYPE_UUID)) {
 			marked.put(marker.getValueReference(), marker.getCohort());
-			if (!flagUuids.contains(marker.getValueReference())) {
+			if (!flagUuids.contains(marker.getValueReference()) && !Boolean.TRUE.equals(marker.getCohort().getVoided())) {
 				// Voiding the list voids its memberships too.
 				cohortService.voidCohortM(marker.getCohort(), PURGED_REASON);
 				result.retired++;

@@ -12,7 +12,10 @@ package org.openmrs.module.rhdflags;
 import java.util.Date;
 
 import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.core.config.Configurator;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.BaseModuleActivator;
 import org.openmrs.module.rhdflags.task.PatientFlagRefreshTask;
@@ -52,26 +55,39 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 	public void started() {
 		applyConfiguredLogLevel();
 		schedule(REFRESH_TASK_NAME, PatientFlagRefreshTask.class.getName(),
-		    "Re-evaluates patient flags whose criteria depend on the passage of time, then mirrors each"
-		            + " flag into a patient list of the same name.");
+		    "Re-evaluates every enabled patient flag, then mirrors each flag into a patient list of the same" + " name.");
 		log.info("RHD Flags module started");
 	}
 	
 	/**
-	 * Puts this module's own entry in log.level into effect, which core applies only from its global
-	 * property listener and then against the nearest configured ancestor, org.openmrs.
+	 * Gives this module its own logger, at log.level's entry for it or inheriting when there is none.
+	 * Core resolves a saved entry to the nearest configured logger, which would otherwise be
+	 * org.openmrs.
 	 */
 	private void applyConfiguredLogLevel() {
 		try {
+			Level level = null;
 			String configured = Context.getAdministrationService()
 			        .getGlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_LOG_LEVEL, "");
 			for (String entry : configured.split(",")) {
 				String[] packageAndLevel = entry.split(":");
 				if (packageAndLevel.length == 2 && LOG_PACKAGE.equals(packageAndLevel[0].trim())) {
-					String level = packageAndLevel[1].trim();
-					Configurator.setLevel(LOG_PACKAGE, Level.toLevel(level, Level.INFO));
-					log.info("Logging for {} set to {}", LOG_PACKAGE, level);
+					level = Level.toLevel(packageAndLevel[1].trim(), Level.INFO);
 				}
+			}
+			
+			LoggerContext context = ((org.apache.logging.log4j.core.Logger) LogManager.getRootLogger()).getContext();
+			Configuration configuration = context.getConfiguration();
+			LoggerConfig own = configuration.getLoggers().get(LOG_PACKAGE);
+			// Only when absent: a level log4j2.xml sets for this package must survive.
+			if (own == null) {
+				configuration.addLogger(LOG_PACKAGE, new LoggerConfig(LOG_PACKAGE, level, true));
+			} else if (level != null) {
+				own.setLevel(level);
+			}
+			context.updateLoggers();
+			if (level != null) {
+				log.info("Logging for {} set to {}", LOG_PACKAGE, level);
 			}
 		}
 		catch (Exception e) {

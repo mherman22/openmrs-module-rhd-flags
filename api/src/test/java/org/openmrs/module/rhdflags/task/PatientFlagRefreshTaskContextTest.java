@@ -479,6 +479,24 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		assertTrue(message, message.contains("1 flags and 0 lists failed"));
 	}
 	
+	@Test
+	public void countsAPurgedFlagsListAsRetiredOnlyOnce() {
+		Flag flag = saveFlag("overdue", MATCHES_ONE);
+		runScheduledWork();
+		purge(flag);
+		
+		String first = summaryOfARun();
+		String second = summaryOfARun();
+		
+		assertTrue(first, first.contains("1 retired"));
+		assertTrue(second, second.contains("0 retired"));
+	}
+	
+	private String summaryOfARun() {
+		return theSummaryIn(logged(PatientFlagRefreshTask.class, Level.INFO, new PatientFlagRefreshTask())).getMessage()
+		        .getFormattedMessage();
+	}
+	
 	private void runScheduledWork() {
 		runScheduledWork(new PatientFlagRefreshTask());
 	}
