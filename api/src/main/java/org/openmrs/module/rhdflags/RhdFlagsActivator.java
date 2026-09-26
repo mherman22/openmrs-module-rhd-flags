@@ -11,11 +11,14 @@ package org.openmrs.module.rhdflags;
 
 import java.util.Date;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.core.config.Configurator;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.BaseModuleActivator;
 import org.openmrs.module.rhdflags.task.PatientFlagRefreshTask;
 import org.openmrs.scheduler.SchedulerService;
 import org.openmrs.scheduler.TaskDefinition;
+import org.openmrs.util.OpenmrsConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +30,8 @@ import org.slf4j.LoggerFactory;
 public class RhdFlagsActivator extends BaseModuleActivator {
 	
 	public static final String REFRESH_TASK_NAME = "RHD Patient Flag Refresh";
+	
+	static final String LOG_PACKAGE = "org.openmrs.module.rhdflags";
 	
 	/**
 	 * The scheduler owns the interval once the task exists, so this is only the value the task is first
@@ -45,10 +50,34 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 	
 	@Override
 	public void started() {
+		applyConfiguredLogLevel();
 		schedule(REFRESH_TASK_NAME, PatientFlagRefreshTask.class.getName(),
 		    "Re-evaluates patient flags whose criteria depend on the passage of time, then mirrors each"
 		            + " flag into a patient list of the same name.");
 		log.info("RHD Flags module started");
+	}
+	
+	/**
+	 * Puts this module's own entry in log.level into effect, which core applies only from its global
+	 * property listener and then against the nearest configured ancestor, org.openmrs.
+	 */
+	private void applyConfiguredLogLevel() {
+		try {
+			String configured = Context.getAdministrationService()
+			        .getGlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_LOG_LEVEL, "");
+			for (String entry : configured.split(",")) {
+				String[] packageAndLevel = entry.split(":");
+				if (packageAndLevel.length == 2 && LOG_PACKAGE.equals(packageAndLevel[0].trim())) {
+					String level = packageAndLevel[1].trim();
+					Configurator.setLevel(LOG_PACKAGE, Level.toLevel(level, Level.INFO));
+					log.info("Logging for {} set to {}", LOG_PACKAGE, level);
+				}
+			}
+		}
+		catch (Exception e) {
+			// Logging configuration is never a reason to fail the module's start.
+			log.warn("Could not apply the configured log level for {}", LOG_PACKAGE, e);
+		}
 	}
 	
 	private void schedule(String name, String taskClass, String description) {

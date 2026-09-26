@@ -53,7 +53,26 @@ public class FlagListSync {
 	
 	private static final Logger log = LoggerFactory.getLogger(FlagListSync.class);
 	
-	public void syncAll() {
+	/**
+	 * What a run of {@link #syncAll()} changed, so the scheduled task can say so in one line.
+	 */
+	public static class Result {
+		
+		int created;
+		
+		int restored;
+		
+		int retired;
+		
+		int membersAdded;
+		
+		int membersEnded;
+		
+		int failures;
+	}
+	
+	public Result syncAll() {
+		Result result = new Result();
 		FlagService flagService = Context.getService(FlagService.class);
 		String requiredTag = Context.getAdministrationService().getGlobalProperty(TAG_PROPERTY);
 		List<Flag> flags = flagService.getAllFlags();
@@ -70,6 +89,8 @@ public class FlagListSync {
 			if (!flagUuids.contains(marker.getValueReference())) {
 				// Voiding the list voids its memberships too.
 				cohortService.voidCohortM(marker.getCohort(), PURGED_REASON);
+				result.retired++;
+				log.info("Retired list '{}': its patient flag no longer exists", marker.getCohort().getName());
 			}
 		}
 		
@@ -77,12 +98,14 @@ public class FlagListSync {
 			boolean listed = Boolean.TRUE.equals(flag.getEnabled()) && !Boolean.TRUE.equals(flag.getRetired())
 			        && carriesTag(flag, requiredTag);
 			try {
-				sync(flag, listed, marked.get(flag.getUuid()));
+				sync(flag, listed, marked.get(flag.getUuid()), result);
 			}
 			catch (Exception e) {
+				result.failures++;
 				log.error("Could not sync the list for flag '{}'", flag.getName(), e);
 			}
 		}
+		return result;
 	}
 	
 	private boolean carriesTag(Flag flag, String requiredTag) {
@@ -100,7 +123,7 @@ public class FlagListSync {
 		return false;
 	}
 	
-	void sync(Flag flag, boolean listed, CohortM marked) {
+	void sync(Flag flag, boolean listed, CohortM marked, Result result) {
 		CohortService cohortService = Context.getService(CohortService.class);
 		
 		CohortM list = cohortService.getCohortMByUuid(flag.getUuid());
@@ -120,21 +143,27 @@ public class FlagListSync {
 				marked.setName(flag.getName());
 				marked.setDescription(description(flag));
 				list = cohortService.saveCohortM(marked);
+				result.restored++;
+				log.info("Restored list '{}': its patient flag exists again", flag.getName());
 			} else if (listWasVoided(flag)) {
 				// Don't recreate a list someone voided: its uuid still exists.
 				return;
 			} else {
 				list = createList(cohortService, flag);
+				result.created++;
 			}
 		} else if (!flag.getName().equals(list.getName())) {
 			// Check before setName: a rejected save leaves the name dirty for the next commit to write.
 			CohortM holder = cohortService.getCohortM(flag.getName());
 			if (holder == null || holder.getUuid().equals(list.getUuid())) {
+				log.info("Renaming list '{}' to '{}'", list.getName(), flag.getName());
 				list.setName(flag.getName());
 				list.setDescription(description(flag));
 				cohortService.saveCohortM(list);
 			} else if (inRenameCycle(cohortService, holder, list)) {
 				// Without one list stepping aside, flags that swap names block each other's lists for good.
+				log.info("Renaming list '{}' aside: '{}' is held by a flag renamed in the same run", list.getName(),
+				    flag.getName());
 				list.setName(flag.getName() + " (" + flag.getUuid() + ")");
 				cohortService.saveCohortM(list);
 			} else {
@@ -146,10 +175,11 @@ public class FlagListSync {
 			mark(cohortService, list, flag);
 		}
 		
-		setMembers(list, listed ? PatientFlagRefreshTask.flaggedMessages(flag).keySet() : Collections.<Integer> emptySet());
+		setMembers(list, listed ? PatientFlagRefreshTask.flaggedMessages(flag).keySet() : Collections.<Integer> emptySet(),
+		    result);
 	}
 	
-	private void setMembers(CohortM list, Set<Integer> flagged) {
+	private void setMembers(CohortM list, Set<Integer> flagged, Result result) {
 		CohortMemberService memberService = Context.getService(CohortMemberService.class);
 		Map<Integer, CohortMember> active = activeMembers(memberService, list);
 		
@@ -176,6 +206,8 @@ public class FlagListSync {
 			}
 		}
 		
+		result.membersAdded += added;
+		result.membersEnded += removed;
 		if (added > 0 || removed > 0) {
 			log.info("List '{}': {} added, {} ended", list.getName(), added, removed);
 		}

@@ -77,6 +77,7 @@ Build the module, then either drop the omod into the running instance:
 
 or, in a distribution, mount it alongside the other modules and restart the backend. Once it
 starts it registers its own scheduled task, so there is nothing to configure to get it running.
+The first run is five minutes after installation, and daily from then on.
 
 Flags whose criteria have become true show up on the patient chart as usual, and each flag also
 appears under **Patient lists** as a list of the patients currently carrying it.
@@ -90,6 +91,21 @@ appears under **Patient lists** as a list of the patients currently carrying it.
 
 The task runs once a day. The scheduler owns the interval once the task exists, so change it in
 **Administration > Manage Scheduler** rather than here.
+
+## Logging
+
+Every run reports itself in one line:
+
+    Patient flag refresh finished in 0.4s: 10 flags evaluated, 3 rows raised, 1 cleared; lists
+    1 created, 0 restored, 0 retired, 3 members added, 1 members ended
+
+A run that could not finish part of its work reports at `warn` instead, saying how many flags and
+lists failed, and logs the cause of each at `error`. The platform's packaged `log4j2.xml` puts
+`org.openmrs` at `warn`, so those are the lines you get without configuring anything.
+
+For the rest, including which list changed and by how much, add `org.openmrs.module.rhdflags:info`
+to `log.level` under **Administration > Settings > Log**. The module applies its own entry at
+startup, because core reads that property only when it is saved on a running server.
 
 ## Building
 

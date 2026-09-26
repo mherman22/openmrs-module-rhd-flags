@@ -11,6 +11,8 @@ package org.openmrs.module.rhdflags.task;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -443,36 +445,90 @@ public class PatientFlagRefreshTaskContextTest extends BaseModuleContextSensitiv
 		assertEquals("gender F", liveMessage(flag));
 	}
 	
+	@Test
+	public void reportsWhatTheListSyncDidAndNotOnlyTheFlags() {
+		saveFlag("overdue", MATCHES_ONE);
+		
+		LogEvent summary = theSummaryIn(logged(PatientFlagRefreshTask.class, Level.INFO, new PatientFlagRefreshTask()));
+		
+		assertEquals(Level.INFO, summary.getLevel());
+		String message = summary.getMessage().getFormattedMessage();
+		assertTrue(message, message.contains("lists 1 created"));
+		assertTrue(message, message.contains("1 members added"));
+	}
+	
+	/**
+	 * The packaged log4j2.xml leaves this module at warn, so a run reporting itself only at info would
+	 * be silent on a default install whether it worked or not.
+	 */
+	@Test
+	public void reportsARunThatFailedAtWarnRatherThanInfo() {
+		saveFlag("overdue", MATCHES_ONE);
+		PatientFlagRefreshTask failing = new PatientFlagRefreshTask() {
+			
+			@Override
+			int[] reconcile(FlagService flagService, Flag flag) {
+				throw new IllegalStateException("criteria is broken");
+			}
+		};
+		
+		LogEvent summary = theSummaryIn(logged(PatientFlagRefreshTask.class, Level.INFO, failing));
+		
+		assertEquals(Level.WARN, summary.getLevel());
+		String message = summary.getMessage().getFormattedMessage();
+		assertTrue(message, message.contains("1 flags and 0 lists failed"));
+	}
+	
 	private void runScheduledWork() {
+		runScheduledWork(new PatientFlagRefreshTask());
+	}
+	
+	private void runScheduledWork(PatientFlagRefreshTask task) {
 		Context.flushSession();
-		new PatientFlagRefreshTask().execute();
+		task.execute();
 	}
 	
 	private int errorsLoggedDuringScheduledWork() {
-		final List<LogEvent> errors = new ArrayList<LogEvent>();
-		AbstractAppender appender = new AbstractAppender("errors", null, null, true, Property.EMPTY_ARRAY) {
+		return logged(FlagListSync.class, Level.ERROR, new PatientFlagRefreshTask()).size();
+	}
+	
+	private List<LogEvent> logged(Class<?> source, final Level threshold, PatientFlagRefreshTask task) {
+		final List<LogEvent> events = new ArrayList<LogEvent>();
+		AbstractAppender appender = new AbstractAppender("capture", null, null, true, Property.EMPTY_ARRAY) {
 			
 			@Override
 			public void append(LogEvent event) {
-				if (event.getLevel().isMoreSpecificThan(Level.ERROR)) {
-					errors.add(event);
+				if (event.getLevel().isMoreSpecificThan(threshold)) {
+					events.add(event.toImmutable());
 				}
 			}
 		};
 		appender.start();
-		Logger logger = (Logger) LogManager.getLogger(FlagListSync.class);
+		Logger logger = (Logger) LogManager.getLogger(source);
 		Level level = logger.getLevel();
 		logger.addAppender(appender);
 		// The test log4j2.xml turns every logger off.
-		logger.setLevel(Level.ERROR);
+		logger.setLevel(threshold);
 		try {
-			runScheduledWork();
+			runScheduledWork(task);
 		}
 		finally {
 			logger.removeAppender(appender);
 			logger.setLevel(level);
 		}
-		return errors.size();
+		return events;
+	}
+	
+	private LogEvent theSummaryIn(List<LogEvent> events) {
+		LogEvent summary = null;
+		for (LogEvent event : events) {
+			if (event.getMessage().getFormattedMessage().contains("Patient flag refresh finished")) {
+				assertNull("a run reported itself more than once", summary);
+				summary = event;
+			}
+		}
+		assertNotNull("the run reported nothing", summary);
+		return summary;
 	}
 	
 	private Flag saveFlag(String name, String criteria) {

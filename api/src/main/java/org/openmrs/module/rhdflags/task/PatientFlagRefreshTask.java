@@ -12,6 +12,7 @@ package org.openmrs.module.rhdflags.task;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -37,7 +38,12 @@ public class PatientFlagRefreshTask extends AbstractTask {
 	
 	@Override
 	public void execute() {
+		long startedAt = System.currentTimeMillis();
+		log.info("Patient flag refresh starting");
+		
 		FlagService flagService = Context.getService(FlagService.class);
+		int evaluated = 0;
+		int failed = 0;
 		int added = 0;
 		int removed = 0;
 		
@@ -45,6 +51,7 @@ public class PatientFlagRefreshTask extends AbstractTask {
 			if (!Boolean.TRUE.equals(flag.getEnabled()) || Boolean.TRUE.equals(flag.getRetired())) {
 				continue;
 			}
+			evaluated++;
 			try {
 				int[] delta = reconcile(flagService, flag);
 				added += delta[0];
@@ -52,16 +59,36 @@ public class PatientFlagRefreshTask extends AbstractTask {
 			}
 			catch (Exception e) {
 				// One bad criterion must not stop the flags behind it from being refreshed.
+				failed++;
 				log.error("Could not refresh flag '{}'", flag.getName(), e);
 			}
 		}
 		
-		log.info("Patient flag refresh complete: {} raised, {} cleared", added, removed);
-		
 		// Clear the refresh's rows first, or every commit the sync makes dirty-checks them all.
 		Context.flushSession();
 		Context.clearSession();
-		new FlagListSync().syncAll();
+		FlagListSync.Result lists = new FlagListSync().syncAll();
+		
+		report(evaluated, failed, added, removed, lists, System.currentTimeMillis() - startedAt);
+	}
+	
+	/**
+	 * Reports both halves of the run in one line, raised to warn when any of it failed: the packaged
+	 * log4j2.xml leaves this module at warn, where a half-working run would otherwise look like
+	 * silence.
+	 */
+	private void report(int evaluated, int failed, int added, int removed, FlagListSync.Result lists, long elapsedMillis) {
+		String summary = String.format(Locale.ROOT,
+		    "Patient flag refresh finished in %.1fs: %d flags evaluated, %d rows raised, %d cleared;"
+		            + " lists %d created, %d restored, %d retired, %d members added, %d members ended",
+		    elapsedMillis / 1000.0, evaluated, added, removed, lists.created, lists.restored, lists.retired,
+		    lists.membersAdded, lists.membersEnded);
+		
+		if (failed > 0 || lists.failures > 0) {
+			log.warn("{}; {} flags and {} lists failed, see the errors logged above", summary, failed, lists.failures);
+		} else {
+			log.info(summary);
+		}
 	}
 	
 	int[] reconcile(FlagService flagService, Flag flag) {
