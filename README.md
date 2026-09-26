@@ -78,8 +78,14 @@ or, in a distribution, mount it alongside the other modules and restart the back
 starts it registers its own scheduled task, so there is nothing to configure to get it running.
 The first run is five minutes after installation, and daily from then on. On a first boot where
 Initializer is still loading the flags at that point, as on an act3 distribution, that run finds no
-flags and the lists appear only after the next day's run; run the task from **Administration >
-Manage Scheduler** once startup has finished to get them sooner.
+flags and the lists appear only after the next day's run. To get them sooner, run the task once
+startup has finished:
+
+    curl -u admin:<password> -X POST -H 'Content-Type: application/json' \
+      -d '{"action":"runtask","tasks":["RHD Patient Flag Refresh"]}' \
+      http://<host>/openmrs/ws/rest/v1/taskaction
+
+**Start** in **Manage Scheduler** does not do this: it reschedules the task for its next daily run.
 
 Flags whose criteria have become true show up on the patient chart as usual, and each flag also
 appears under **Patient lists** as a list of the patients currently carrying it.
@@ -105,10 +111,22 @@ A run that could not finish part of its work reports at `warn` instead, saying h
 lists failed, and logs the cause of each at `error`. The platform's packaged `log4j2.xml` puts
 `org.openmrs` at `warn`, so those are the lines you get without configuring anything.
 
-For the rest, including which list changed and by how much, add `org.openmrs.module.rhdflags:info`
-to `log.level` under **Administration > Settings > Log**, then restart. The module gives itself its
-own logger at startup, so the entry reaches only this module. On platform 2.4.0 to 2.4.3 and 2.5.0,
-core applies the entry to `org.openmrs` as a whole, which the module cannot prevent.
+For the rest, including which list changed and by how much, give `org.openmrs.module.rhdflags` a
+logger of its own in core's logging configuration. On platform 2.4.4, 2.5.1, 2.6.0 and later, core
+reads a `log4j2.xml` from the application data directory in place of the packaged one, so copy the
+platform's `log4j2.xml` there and add
+
+    <Logger name="org.openmrs.module.rhdflags" level="info" />
+
+to its `<Loggers>`, then restart. A `log.level` entry for `org.openmrs.module.rhdflags` then changes
+that logger alone. Without it, core applies such an entry to the nearest logger its configuration
+defines, `org.openmrs`, and everything under it moves too. On these platforms core applies a
+`log.level` entry when it is saved, not at startup, so after a restart the logger is back at the
+level in `log4j2.xml`; set the level you want to keep there.
+
+On 2.4.0 to 2.4.3 and on 2.5.0, core reads no `log4j2.xml` from the application data directory, so
+this route is not available. On those platforms core applies `log.level` at every startup as well
+as on a save, and an entry for `org.openmrs.module.rhdflags` sets the level of all of `org.openmrs`.
 
 ## Building
 
