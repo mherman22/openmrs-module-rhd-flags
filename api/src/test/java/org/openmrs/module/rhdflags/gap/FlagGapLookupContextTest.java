@@ -11,12 +11,19 @@ package org.openmrs.module.rhdflags.gap;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Property;
 import org.junit.Before;
 import org.junit.Test;
 import org.openmrs.Encounter;
@@ -118,6 +125,44 @@ public class FlagGapLookupContextTest extends BaseModuleContextSensitiveTest {
 		assertEquals(ENCOUNTER_3, onlyEncounter(lookup.find(patient(), flag)));
 	}
 	
+	@Test
+	public void warnsOfAnEncounterCellThatIsNotAnEncounterUuid() {
+		configure("select e.encounter_id, '" + WEIGHT + "' from encounter e where e.patient_id = :patientId");
+		List<FlagGap> gaps = new ArrayList<FlagGap>();
+		
+		List<LogEvent> warnings = warningsWhileFinding(gaps);
+		
+		assertTrue(gaps.isEmpty());
+		assertTrue(!warnings.isEmpty());
+		assertTrue(warnings.get(0).getMessage().getFormattedMessage().contains("not an encounter uuid"));
+	}
+	
+	@Test
+	public void warnsOfAQuestionCellThatIsNotAConceptUuid() {
+		configure("select e.uuid, 5089 from encounter e where e.patient_id = :patientId and e.encounter_id = 3");
+		List<FlagGap> gaps = new ArrayList<FlagGap>();
+		
+		List<LogEvent> warnings = warningsWhileFinding(gaps);
+		
+		assertTrue(gaps.isEmpty());
+		assertEquals(1, warnings.size());
+		assertTrue(warnings.get(0).getMessage().getFormattedMessage().contains("not a concept uuid"));
+	}
+	
+	@Test
+	public void doesNotWarnOfAnEncounterItFiltersOut() {
+		configure("select e.uuid, '" + WEIGHT + "' from encounter e where :patientId = :patientId"
+		        + " and e.encounter_id in (3, 5, 6) order by e.encounter_id");
+		Encounter five = Context.getEncounterService().getEncounterByUuid(ENCOUNTER_5);
+		Context.getEncounterService().voidEncounter(five, "test");
+		List<FlagGap> gaps = new ArrayList<FlagGap>();
+		
+		List<LogEvent> warnings = warningsWhileFinding(gaps);
+		
+		assertEquals(ENCOUNTER_3, onlyEncounter(gaps));
+		assertTrue(warnings.isEmpty());
+	}
+	
 	@Test(expected = APIException.class)
 	public void refusesAQueryThatDoesNotNameThePatient() {
 		configure("select e.uuid, '" + WEIGHT + "' from encounter e");
@@ -200,6 +245,33 @@ public class FlagGapLookupContextTest extends BaseModuleContextSensitiveTest {
 	private void configure(String sql) {
 		Context.getAdministrationService()
 		        .saveGlobalProperty(new GlobalProperty(FlagGapLookup.GAP_QUERY_PREFIX + flag.getUuid(), sql));
+	}
+	
+	private List<LogEvent> warningsWhileFinding(List<FlagGap> gaps) {
+		final List<LogEvent> events = new ArrayList<LogEvent>();
+		AbstractAppender appender = new AbstractAppender("capture", null, null, true, Property.EMPTY_ARRAY) {
+			
+			@Override
+			public void append(LogEvent event) {
+				if (event.getLevel().isMoreSpecificThan(Level.WARN)) {
+					events.add(event.toImmutable());
+				}
+			}
+		};
+		appender.start();
+		Logger logger = (Logger) LogManager.getLogger(FlagGapLookup.class);
+		Level level = logger.getLevel();
+		logger.addAppender(appender);
+		// The test log4j2.xml turns every logger off.
+		logger.setLevel(Level.WARN);
+		try {
+			gaps.addAll(lookup.find(patient(), flag));
+		}
+		finally {
+			logger.removeAppender(appender);
+			logger.setLevel(level);
+		}
+		return events;
 	}
 	
 	private String onlyEncounter(List<FlagGap> gaps) {

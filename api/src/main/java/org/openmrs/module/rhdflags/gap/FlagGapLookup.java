@@ -23,6 +23,8 @@ import org.openmrs.module.patientflags.Flag;
 import org.openmrs.module.patientflags.PatientFlagsConstants;
 import org.openmrs.module.patientflags.api.FlagService;
 import org.openmrs.util.PrivilegeConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Lists a flag's gaps from the query in {@value #GAP_QUERY_PREFIX}&lt;flag uuid&gt;, which names
@@ -33,6 +35,8 @@ public class FlagGapLookup {
 	public static final String GAP_QUERY_PREFIX = "rhdflags.gapQuery.";
 	
 	public static final String PATIENT_TOKEN = ":patientId";
+	
+	private static final Logger log = LoggerFactory.getLogger(FlagGapLookup.class);
 	
 	/**
 	 * Reading a flag definition takes Test Flags, which a clinician who sees flags on the chart need
@@ -94,12 +98,18 @@ public class FlagGapLookup {
 				continue;
 			}
 			Encounter encounter = Context.getEncounterService().getEncounterByUuid(row.get(0).toString());
-			if (encounter == null || encounter.getVoided() || !patient.equals(encounter.getPatient())
+			if (encounter == null) {
+				log.warn("The gap query for flag {} returned {}, which is not an encounter uuid", flag.getUuid(),
+				    row.get(0));
+				continue;
+			}
+			if (encounter.getVoided() || !patient.equals(encounter.getPatient())
 			        || !Context.getEncounterService().canViewEncounter(encounter, Context.getAuthenticatedUser())) {
 				continue;
 			}
 			Concept question = Context.getConceptService().getConceptByUuid(row.get(1).toString());
 			if (question == null) {
+				log.warn("The gap query for flag {} returned {}, which is not a concept uuid", flag.getUuid(), row.get(1));
 				continue;
 			}
 			gaps.add(new FlagGap(encounter, question));
