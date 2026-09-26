@@ -38,8 +38,8 @@ public class RhdFlagsActivatorContextTest extends BaseModuleContextSensitiveTest
 	}
 	
 	/**
-	 * Uses the per-logger lookup core's save path makes on 2.4.4 and later, where saving log.level does
-	 * not reload the configuration first.
+	 * Calls applyLogLevel directly, as saving log.level does on 2.4.4 and later; on 2.4.0 a save
+	 * reconfigures first.
 	 */
 	@Test
 	public void aSavedLevelForThisModuleLeavesTheRestOfOpenmrsAlone() {
@@ -66,8 +66,6 @@ public class RhdFlagsActivatorContextTest extends BaseModuleContextSensitiveTest
 	public void theEntryInLogLevelWinsOverALevelLog4jConfigurationSets() {
 		Context.getAdministrationService().saveGlobalProperty(
 		    new GlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_LOG_LEVEL, "org.openmrs.module.rhdflags:info"));
-		// Undo core's listener, which applied the saved entry to an ancestor logger.
-		context().reconfigure();
 		context().getConfiguration().addLogger("org.openmrs.module.rhdflags",
 		    new LoggerConfig("org.openmrs.module.rhdflags", Level.WARN, true));
 		context().updateLoggers();

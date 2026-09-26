@@ -61,8 +61,8 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 	}
 	
 	/**
-	 * Gives this module its own logger, so core resolves a saved log.level entry for it here rather
-	 * than to the nearest configured ancestor, org.openmrs.
+	 * Gives this module its own logger, so on 2.4.4 and later core resolves a saved log.level entry for
+	 * it here rather than to the nearest configured ancestor, org.openmrs.
 	 */
 	private void applyConfiguredLogLevel() {
 		try {
@@ -79,7 +79,7 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 			LoggerContext context = ((org.apache.logging.log4j.core.Logger) LogManager.getRootLogger()).getContext();
 			Configuration configuration = context.getConfiguration();
 			LoggerConfig own = configuration.getLoggers().get(LOG_PACKAGE);
-			// Only when absent: a level log4j2.xml sets for this package must survive.
+			// Only when absent: keep a log4j2.xml logger for this package, changing just its level.
 			if (own == null) {
 				configuration.addLogger(LOG_PACKAGE, new LoggerConfig(LOG_PACKAGE, level, true));
 			} else if (level != null) {
