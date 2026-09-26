@@ -120,7 +120,13 @@ platform's `log4j2.xml` there and add
 
 to its `<Loggers>`, then restart. A `log.level` entry for `org.openmrs.module.rhdflags` then changes
 that logger alone. Without it, core applies such an entry to the nearest logger its configuration
-defines, `org.openmrs`, and everything under it moves too.
+defines, `org.openmrs`, and everything under it moves too. On these platforms core applies a
+`log.level` entry when it is saved, not at startup, so after a restart the logger is back at the
+level in `log4j2.xml`; set the level you want to keep there.
+
+On 2.4.0 to 2.4.3 and on 2.5.0, core reads no `log4j2.xml` from the application data directory, so
+this route is not available. On those platforms core applies `log.level` at every startup as well
+as on a save, and an entry for `org.openmrs.module.rhdflags` sets the level of all of `org.openmrs`.
 
 ## Building
 
