@@ -2,7 +2,8 @@
 
 [![Build with Maven](https://github.com/mherman22/openmrs-module-rhd-flags/actions/workflows/build.yml/badge.svg)](https://github.com/mherman22/openmrs-module-rhd-flags/actions/workflows/build.yml)
 
-Scheduled maintenance for patient flags, and for the patient lists built from them.
+Scheduled maintenance for patient flags, and for the patient lists built from them, and a look-up
+of the data missing behind a flag.
 
 ## Why this exists
 
@@ -57,6 +58,45 @@ voided. A flag recreated under the deleted flag's uuid, as Initializer does, get
 with the flag's current patients, unless another cohort already holds the flag's name. A list
 someone voided stays voided.
 
+### Gap look-up
+
+A flag says which patients match, not what is missing. For a flag that stands for missing data,
+the module can list the gaps behind it, one entry per encounter and question, so a client can
+open the encounter that still needs the answer:
+
+    GET /ws/rest/v1/rhdflags/gap?patient=<patient uuid>&flag=<flag uuid>
+
+    {"configured": true,
+     "results": [{"encounter": "<uuid>", "encounterDatetime": "2026-03-14T09:00:00.000+0000",
+                  "form": {"uuid": "<uuid>", "display": "Procedures and Outcomes", "links": [...]},
+                  "concept": {"uuid": "<uuid>", "display": "Perfusion Issues", "links": [...]}}]}
+
+`form` and `concept` are the REST module's reference representations.
+
+Each flag that supports this has a query in the global property `rhdflags.gapQuery.<flag uuid>`.
+The query names the patient as `:patientId`, which the module replaces with the patient's id, and
+returns rows of (encounter uuid, uuid of the question whose answer is missing). For example, for a
+flag raised when a discharged patient's Perfusion Issues answer is missing:
+
+    SELECT e.uuid, q.uuid FROM encounter e JOIN concept q ON q.uuid = '<Perfusion Issues uuid>'
+    WHERE e.patient_id = :patientId AND e.voided = 0 AND ...
+      AND NOT EXISTS (SELECT 1 FROM obs o WHERE o.encounter_id = e.encounter_id
+                      AND o.concept_id = q.concept_id AND o.voided = 0)
+
+A flag without a query answers `"configured": false` with no results. The response carries only
+the patient's own unvoided encounters and real concepts: a row naming another patient's encounter,
+a voided one, one of a type the caller may not view, or something that is not a concept uuid is left
+out, and a query without
+`:patientId` is refused. Days pending can be counted from `encounterDatetime`.
+
+Calling it takes View Patient Flags, the privilege that shows flags on the chart, along with the
+Get Patients, Get Encounters and Get Concepts privileges for the data it returns. For a caller
+without Get Forms, `form` is null. The module reads
+the flag definition and the gap query, and runs the query, on the caller's behalf. Whoever can edit global properties
+can therefore change what these queries select, as whoever can manage flags can with a flag's
+criteria; the response carries only the patient's encounters, their forms and dates, and concept names
+either way.
+
 ### Upstream
 
 Two of the reasons this module exists are defects in patientflags rather than facts of life, and
@@ -66,7 +106,7 @@ reconciliation logic.
 
 ## Requirements
 
-OpenMRS platform 2.4.0 or later, patientflags 3.0.10, cohort 3.7.3.
+OpenMRS platform 2.4.0 or later, patientflags 3.0.10, cohort 3.7.3, webservices.rest 2.40.0.
 
 ## Installing
 

@@ -19,7 +19,7 @@
   <package>org.openmrs.module.rhdflags</package>
   <author>UW DIGI</author>
   <description>
-    Scheduled re-evaluation of every enabled, unretired patient flag, mirrored into patient lists.
+    Scheduled re-evaluation of every enabled, unretired patient flag, mirrored into patient lists, and a look-up of the data missing behind a flag.
   </description>
 
   <activator>org.openmrs.module.rhdflags.RhdFlagsActivator</activator>
@@ -28,6 +28,7 @@
   <require_modules>
     <require_module version="${patientflagsVersion}">org.openmrs.module.patientflags</require_module>
     <require_module version="${cohortVersion}">org.openmrs.module.cohort</require_module>
+    <require_module version="${webservicesRestVersion}">org.openmrs.module.webservices.rest</require_module>
   </require_modules>
 
   <globalProperty>
