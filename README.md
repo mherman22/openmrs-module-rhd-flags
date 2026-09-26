@@ -91,13 +91,14 @@ place of `e.uuid`, is also logged as a warning, since a query returning only suc
 answers exactly as one that finds no gaps. A query without `:patientId`, or one that returns a row
 of fewer than two columns, is refused. Days pending can be counted from `encounterDatetime`.
 
-Calling it takes View Patient Flags, the privilege that shows flags on the chart, along with the
-Get Patients, Get Encounters and Get Concepts privileges for the data it returns. patientflags
-3.0.10 checks View Patient Flags but does not create it, so a distribution creates that privilege
-and grants it to the roles that should see flags. For a caller without Get Forms, `form` is null. The module reads the flag definition and the gap query, and
-runs the query, on the caller's behalf. Whoever can edit global properties can therefore change
-what these queries select, as whoever can manage flags can with a flag's criteria; the response
-carries only the patient's encounters, their forms and dates, and concept names either way.
+Calling it takes View Patient Flags, the privilege that shows flags on the chart, along with the Get
+Patients, Get Encounters and Get Concepts privileges for the data it returns. patientflags 3.0.10
+checks View Patient Flags but does not create it, so a distribution creates that privilege and
+grants it to the roles that should see flags. For a caller without Get Forms, `form` is null. The
+module reads the flag definition and the gap query, and runs the query, on the caller's behalf.
+Whoever can edit global properties can therefore change what these queries select, as whoever can
+manage flags can with a flag's criteria; the response carries only the patient's encounters, their
+forms and dates, and concept names either way.
 
 ### Upstream
 
