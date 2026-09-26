@@ -12,6 +12,8 @@ package org.openmrs.module.rhdflags;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Date;
+
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
@@ -107,15 +109,20 @@ public class RhdFlagsActivatorContextTest extends BaseModuleContextSensitiveTest
 		task.setName(RhdFlagsActivator.REFRESH_TASK_NAME);
 		task.setDescription("an older description");
 		task.setTaskClass(PatientFlagRefreshTask.class.getName());
-		task.setRepeatInterval(86400L);
+		task.setRepeatInterval(3600L);
+		Date startTime = new Date(1500000000000L);
+		task.setStartTime(startTime);
 		task.setStartOnStartup(Boolean.TRUE);
 		task.setStarted(Boolean.FALSE);
 		schedulerService.saveTaskDefinition(task);
 		
 		new RhdFlagsActivator().started();
 		
-		String description = schedulerService.getTaskByName(RhdFlagsActivator.REFRESH_TASK_NAME).getDescription();
-		assertTrue(description, description.startsWith("Re-evaluates every enabled, unretired patient flag"));
+		TaskDefinition refreshed = schedulerService.getTaskByName(RhdFlagsActivator.REFRESH_TASK_NAME);
+		assertTrue(refreshed.getDescription(),
+		    refreshed.getDescription().startsWith("Re-evaluates every enabled, unretired patient flag"));
+		assertEquals(Long.valueOf(3600L), refreshed.getRepeatInterval());
+		assertEquals(startTime.getTime(), refreshed.getStartTime().getTime());
 	}
 	
 	private LoggerContext context() {
