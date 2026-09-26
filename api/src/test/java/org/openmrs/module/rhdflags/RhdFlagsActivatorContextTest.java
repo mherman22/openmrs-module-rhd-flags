@@ -67,10 +67,23 @@ public class RhdFlagsActivatorContextTest extends BaseModuleContextSensitiveTest
 		context().getConfiguration().addLogger("org.openmrs.module.rhdflags",
 		    new LoggerConfig("org.openmrs.module.rhdflags", Level.WARN, true));
 		context().updateLoggers();
+		// Fetched first, as the module's own loggers are, so it only sees the change if loggers are refreshed.
+		org.apache.logging.log4j.Logger existing = LogManager.getLogger(MODULE_LOGGER);
 		
 		new RhdFlagsActivator().started();
 		
-		assertEquals(Level.INFO, LogManager.getLogger(MODULE_LOGGER).getLevel());
+		assertEquals(Level.INFO, existing.getLevel());
+	}
+	
+	@Test
+	public void keepsALevelLog4jConfigurationSetsWhenLogLevelDoesNotNameTheModule() {
+		context().getConfiguration().addLogger("org.openmrs.module.rhdflags",
+		    new LoggerConfig("org.openmrs.module.rhdflags", Level.WARN, true));
+		context().updateLoggers();
+		
+		new RhdFlagsActivator().started();
+		
+		assertEquals(Level.WARN, LogManager.getLogger(MODULE_LOGGER).getLevel());
 	}
 	
 	private LoggerContext context() {
