@@ -18,7 +18,10 @@ import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.junit.After;
 import org.junit.Test;
+import org.openmrs.GlobalProperty;
+import org.openmrs.api.context.Context;
 import org.openmrs.test.BaseModuleContextSensitiveTest;
+import org.openmrs.util.OpenmrsConstants;
 import org.openmrs.util.OpenmrsUtil;
 
 public class RhdFlagsActivatorContextTest extends BaseModuleContextSensitiveTest {
@@ -53,6 +56,19 @@ public class RhdFlagsActivatorContextTest extends BaseModuleContextSensitiveTest
 		OpenmrsUtil.applyLogLevel("org.openmrs", "debug");
 		
 		assertEquals(Level.DEBUG, LogManager.getLogger(MODULE_LOGGER).getLevel());
+	}
+	
+	@Test
+	public void theEntryInLogLevelWinsOverALevelLog4jConfigurationSets() {
+		context().getConfiguration().addLogger("org.openmrs.module.rhdflags",
+		    new LoggerConfig("org.openmrs.module.rhdflags", Level.WARN, true));
+		context().updateLoggers();
+		Context.getAdministrationService().saveGlobalProperty(
+		    new GlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_LOG_LEVEL, "org.openmrs.module.rhdflags:info"));
+		
+		new RhdFlagsActivator().started();
+		
+		assertEquals(Level.INFO, LogManager.getLogger(MODULE_LOGGER).getLevel());
 	}
 	
 	private LoggerContext context() {
