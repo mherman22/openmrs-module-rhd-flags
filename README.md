@@ -76,7 +76,10 @@ Build the module, then either drop the omod into the running instance:
 
 or, in a distribution, mount it alongside the other modules and restart the backend. Once it
 starts it registers its own scheduled task, so there is nothing to configure to get it running.
-The first run is five minutes after installation, and daily from then on.
+The first run is five minutes after installation, and daily from then on. On a first boot where
+Initializer is still loading the flags at that point, as on an act3 distribution, that run finds no
+flags and the lists appear only after the next day's run; run the task from **Administration >
+Manage Scheduler** once startup has finished to get them sooner.
 
 Flags whose criteria have become true show up on the patient chart as usual, and each flag also
 appears under **Patient lists** as a list of the patients currently carrying it.
