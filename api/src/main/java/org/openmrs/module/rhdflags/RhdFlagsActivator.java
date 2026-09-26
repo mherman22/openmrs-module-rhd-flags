@@ -55,7 +55,8 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 	public void started() {
 		applyConfiguredLogLevel();
 		schedule(REFRESH_TASK_NAME, PatientFlagRefreshTask.class.getName(),
-		    "Re-evaluates every enabled patient flag, then mirrors each flag into a patient list of the same" + " name.");
+		    "Re-evaluates every enabled, unretired patient flag, then mirrors each flag into a patient list"
+		            + " of the same name.");
 		log.info("RHD Flags module started");
 	}
 	

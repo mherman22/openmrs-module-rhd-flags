@@ -16,7 +16,7 @@
   <packaging>pom</packaging>
 
   <name>RHD Flags</name>
-  <description>Scheduled re-evaluation of every enabled patient flag, mirrored into patient lists.</description>
+  <description>Scheduled re-evaluation of every enabled, unretired patient flag, mirrored into patient lists.</description>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
