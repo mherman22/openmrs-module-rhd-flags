@@ -16,13 +16,14 @@
   <packaging>pom</packaging>
 
   <name>RHD Flags</name>
-  <description>Scheduled re-evaluation of every enabled, unretired patient flag, mirrored into patient lists.</description>
+  <description>Scheduled re-evaluation of every enabled, unretired patient flag, mirrored into patient lists, and a look-up of the data missing behind a flag.</description>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <openmrsPlatformVersion>2.4.0</openmrsPlatformVersion>
     <patientflagsVersion>3.0.10</patientflagsVersion>
     <cohortVersion>3.7.3</cohortVersion>
+    <webservicesRestVersion>2.40.0</webservicesRestVersion>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
   </properties>
@@ -50,6 +51,18 @@
         <groupId>org.openmrs.module</groupId>
         <artifactId>cohort-api</artifactId>
         <version>${cohortVersion}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.openmrs.web</groupId>
+        <artifactId>openmrs-web</artifactId>
+        <version>${openmrsPlatformVersion}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.openmrs.module</groupId>
+        <artifactId>webservices.rest-omod-common</artifactId>
+        <version>${webservicesRestVersion}</version>
         <scope>provided</scope>
       </dependency>
       <dependency>

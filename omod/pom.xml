@@ -23,9 +23,117 @@
       <artifactId>rhdflags-api</artifactId>
       <version>${project.parent.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.openmrs.web</groupId>
+      <artifactId>openmrs-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>webservices.rest-omod-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>patientflags-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>cohort-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.api</groupId>
+      <artifactId>openmrs-api</artifactId>
+      <version>${openmrsPlatformVersion}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.web</groupId>
+      <artifactId>openmrs-web</artifactId>
+      <version>${openmrsPlatformVersion}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.test</groupId>
+      <artifactId>openmrs-test</artifactId>
+      <type>pom</type>
+    </dependency>
+    <!-- the REST resources, so the controller's REF representations resolve under test -->
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>webservices.rest-omod-1.8</artifactId>
+      <version>${webservicesRestVersion}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>webservices.rest-omod-1.9</artifactId>
+      <version>${webservicesRestVersion}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>webservices.rest-omod-1.10</artifactId>
+      <version>${webservicesRestVersion}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>webservices.rest-omod-1.11</artifactId>
+      <version>${webservicesRestVersion}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>webservices.rest-omod-1.12</artifactId>
+      <version>${webservicesRestVersion}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>webservices.rest-omod-2.0</artifactId>
+      <version>${webservicesRestVersion}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>webservices.rest-omod-2.1</artifactId>
+      <version>${webservicesRestVersion}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>webservices.rest-omod-2.2</artifactId>
+      <version>${webservicesRestVersion}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>webservices.rest-omod-2.3</artifactId>
+      <version>${webservicesRestVersion}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
+      <artifactId>webservices.rest-omod-2.4</artifactId>
+      <version>${webservicesRestVersion}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
+    <testResources>
+      <!-- the api module's test context and hibernate mappings, so both modules test against one setup -->
+      <testResource>
+        <directory>../api/src/test/resources</directory>
+      </testResource>
+    </testResources>
     <resources>
       <resource>
         <directory>src/main/resources</directory>
