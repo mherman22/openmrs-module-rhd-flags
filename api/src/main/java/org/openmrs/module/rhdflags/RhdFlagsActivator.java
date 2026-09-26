@@ -11,17 +11,11 @@ package org.openmrs.module.rhdflags;
 
 import java.util.Date;
 
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.LoggerContext;
-import org.apache.logging.log4j.core.config.Configuration;
-import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.BaseModuleActivator;
 import org.openmrs.module.rhdflags.task.PatientFlagRefreshTask;
 import org.openmrs.scheduler.SchedulerService;
 import org.openmrs.scheduler.TaskDefinition;
-import org.openmrs.util.OpenmrsConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,8 +27,6 @@ import org.slf4j.LoggerFactory;
 public class RhdFlagsActivator extends BaseModuleActivator {
 	
 	public static final String REFRESH_TASK_NAME = "RHD Patient Flag Refresh";
-	
-	static final String LOG_PACKAGE = "org.openmrs.module.rhdflags";
 	
 	/**
 	 * The scheduler owns the interval once the task exists, so this is only the value the task is first
@@ -53,47 +45,10 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 	
 	@Override
 	public void started() {
-		applyConfiguredLogLevel();
 		schedule(REFRESH_TASK_NAME, PatientFlagRefreshTask.class.getName(),
 		    "Re-evaluates every enabled, unretired patient flag, then mirrors each flag into a patient list"
 		            + " of the same name.");
 		log.info("RHD Flags module started");
-	}
-	
-	/**
-	 * Gives this module its own logger, so on 2.4.4 and later core resolves a saved log.level entry for
-	 * it here rather than to the nearest configured ancestor, org.openmrs.
-	 */
-	private void applyConfiguredLogLevel() {
-		try {
-			Level level = null;
-			String configured = Context.getAdministrationService()
-			        .getGlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_LOG_LEVEL, "");
-			for (String entry : configured.split(",")) {
-				String[] packageAndLevel = entry.split(":");
-				if (packageAndLevel.length == 2 && LOG_PACKAGE.equals(packageAndLevel[0].trim())) {
-					level = Level.toLevel(packageAndLevel[1].trim(), Level.INFO);
-				}
-			}
-			
-			LoggerContext context = ((org.apache.logging.log4j.core.Logger) LogManager.getRootLogger()).getContext();
-			Configuration configuration = context.getConfiguration();
-			LoggerConfig own = configuration.getLoggers().get(LOG_PACKAGE);
-			// Only when absent: keep a log4j2.xml logger for this package, changing just its level.
-			if (own == null) {
-				configuration.addLogger(LOG_PACKAGE, new LoggerConfig(LOG_PACKAGE, level, true));
-			} else if (level != null) {
-				own.setLevel(level);
-			}
-			context.updateLoggers();
-			if (level != null) {
-				log.info("Logging for {} set to {}", LOG_PACKAGE, level);
-			}
-		}
-		catch (Exception e) {
-			// Logging configuration is never a reason to fail the module's start.
-			log.warn("Could not apply the configured log level for {}", LOG_PACKAGE, e);
-		}
 	}
 	
 	private void schedule(String name, String taskClass, String description) {

@@ -14,93 +14,14 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Date;
 
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
-import org.apache.logging.log4j.core.LoggerContext;
-import org.apache.logging.log4j.core.config.LoggerConfig;
-import org.junit.After;
 import org.junit.Test;
-import org.openmrs.GlobalProperty;
 import org.openmrs.api.context.Context;
 import org.openmrs.test.BaseModuleContextSensitiveTest;
 import org.openmrs.module.rhdflags.task.PatientFlagRefreshTask;
 import org.openmrs.scheduler.SchedulerService;
 import org.openmrs.scheduler.TaskDefinition;
-import org.openmrs.util.OpenmrsConstants;
-import org.openmrs.util.OpenmrsUtil;
 
 public class RhdFlagsActivatorContextTest extends BaseModuleContextSensitiveTest {
-	
-	private static final String MODULE_LOGGER = "org.openmrs.module.rhdflags.task.PatientFlagRefreshTask";
-	
-	@After
-	public void restoreLogging() {
-		context().reconfigure();
-	}
-	
-	/**
-	 * Calls applyLogLevel directly, as saving log.level does on 2.4.4 and later; on 2.4.0 a save
-	 * reconfigures first.
-	 */
-	@Test
-	public void aSavedLevelForThisModuleLeavesTheRestOfOpenmrsAlone() {
-		new RhdFlagsActivator().started();
-		LoggerConfig openmrs = context().getConfiguration().getLoggerConfig("org.openmrs");
-		Level openmrsLevel = openmrs.getLevel();
-		
-		OpenmrsUtil.applyLogLevel("org.openmrs.module.rhdflags", "info");
-		
-		assertEquals(openmrsLevel, openmrs.getLevel());
-		assertEquals(Level.INFO, LogManager.getLogger(MODULE_LOGGER).getLevel());
-	}
-	
-	@Test
-	public void theModuleStillFollowsOpenmrsWhenLogLevelDoesNotNameIt() {
-		new RhdFlagsActivator().started();
-		
-		OpenmrsUtil.applyLogLevel("org.openmrs", "debug");
-		
-		assertEquals(Level.DEBUG, LogManager.getLogger(MODULE_LOGGER).getLevel());
-	}
-	
-	@Test
-	public void theEntryInLogLevelWinsOverALevelLog4jConfigurationSets() {
-		Context.getAdministrationService().saveGlobalProperty(
-		    new GlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_LOG_LEVEL, "org.openmrs.module.rhdflags:info"));
-		context().getConfiguration().addLogger("org.openmrs.module.rhdflags",
-		    new LoggerConfig("org.openmrs.module.rhdflags", Level.WARN, true));
-		context().updateLoggers();
-		// Fetched first, as the module's own loggers are, so it only sees the change if loggers are refreshed.
-		org.apache.logging.log4j.Logger existing = LogManager.getLogger(MODULE_LOGGER);
-		
-		new RhdFlagsActivator().started();
-		
-		assertEquals(Level.INFO, existing.getLevel());
-	}
-	
-	@Test
-	public void keepsALevelLog4jConfigurationSetsWhenLogLevelDoesNotNameTheModule() {
-		context().getConfiguration().addLogger("org.openmrs.module.rhdflags",
-		    new LoggerConfig("org.openmrs.module.rhdflags", Level.WARN, true));
-		context().updateLoggers();
-		
-		new RhdFlagsActivator().started();
-		
-		assertEquals(Level.WARN, LogManager.getLogger(MODULE_LOGGER).getLevel());
-	}
-	
-	@Test
-	public void anEntryForAnotherPackageLeavesTheModuleFollowingOpenmrs() {
-		Context.getAdministrationService()
-		        .saveGlobalProperty(new GlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_LOG_LEVEL, "org.openmrs.api:info"));
-		context().reconfigure();
-		
-		new RhdFlagsActivator().started();
-		OpenmrsUtil.applyLogLevel("org.openmrs", "debug");
-		
-		assertEquals(Level.DEBUG, LogManager.getLogger(MODULE_LOGGER).getLevel());
-	}
 	
 	@Test
 	public void updatesTheDescriptionOfATaskAnEarlierVersionRegistered() {
@@ -125,7 +46,4 @@ public class RhdFlagsActivatorContextTest extends BaseModuleContextSensitiveTest
 		assertEquals(startTime.getTime(), refreshed.getStartTime().getTime());
 	}
 	
-	private LoggerContext context() {
-		return ((Logger) LogManager.getRootLogger()).getContext();
-	}
 }

@@ -111,12 +111,16 @@ A run that could not finish part of its work reports at `warn` instead, saying h
 lists failed, and logs the cause of each at `error`. The platform's packaged `log4j2.xml` puts
 `org.openmrs` at `warn`, so those are the lines you get without configuring anything.
 
-For the rest, including which list changed and by how much, add `org.openmrs.module.rhdflags:info`
-to `log.level` under **Administration > Settings > Log**, then restart. Saving that page reloads
-core's logging configuration, which can drop the module's own logger, so restart after every save
-of it. At startup the module gives itself its own logger and the entry reaches only this module. On
-platform 2.4.0 to 2.4.3 and 2.5.0, core applies the entry to `org.openmrs` even after a restart,
-which the module cannot prevent.
+For the rest, including which list changed and by how much, give `org.openmrs.module.rhdflags` a
+logger of its own in core's logging configuration. On platform 2.4.4, 2.5.1, 2.6.0 and later, core
+reads a `log4j2.xml` from the application data directory in place of the packaged one, so copy the
+platform's `log4j2.xml` there and add
+
+    <Logger name="org.openmrs.module.rhdflags" level="info" />
+
+to its `<Loggers>`, then restart. A `log.level` entry for `org.openmrs.module.rhdflags` then changes
+that logger alone. Without it, core applies such an entry to the nearest logger its configuration
+defines, `org.openmrs`, and everything under it moves too.
 
 ## Building
 
