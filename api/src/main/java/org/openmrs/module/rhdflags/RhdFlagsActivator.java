@@ -34,6 +34,13 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 	 */
 	private static final long REFRESH_INTERVAL_SECONDS = 86400L;
 	
+	/**
+	 * Keeps the first run minutes after installation rather than a day after it. The scheduler derives
+	 * the first execution from startTime + repeatInterval once startTime is past, so a task registered
+	 * at the current instant leaves a fresh install with no flag lists until tomorrow.
+	 */
+	private static final long INITIAL_DELAY_MILLIS = 300000L;
+	
 	private static final Logger log = LoggerFactory.getLogger(RhdFlagsActivator.class);
 	
 	@Override
@@ -56,7 +63,7 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 			task.setName(name);
 			task.setDescription(description);
 			task.setTaskClass(taskClass);
-			task.setStartTime(new Date());
+			task.setStartTime(new Date(System.currentTimeMillis() + INITIAL_DELAY_MILLIS));
 			task.setRepeatInterval(REFRESH_INTERVAL_SECONDS);
 			task.setStartOnStartup(Boolean.TRUE);
 			task.setStarted(Boolean.TRUE);
