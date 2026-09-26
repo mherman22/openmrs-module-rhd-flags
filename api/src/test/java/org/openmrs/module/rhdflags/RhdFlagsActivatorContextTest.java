@@ -66,7 +66,7 @@ public class RhdFlagsActivatorContextTest extends BaseModuleContextSensitiveTest
 	public void theEntryInLogLevelWinsOverALevelLog4jConfigurationSets() {
 		Context.getAdministrationService().saveGlobalProperty(
 		    new GlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_LOG_LEVEL, "org.openmrs.module.rhdflags:info"));
-		// Undo what core's listener did with the save, so only the log4j configuration below is in play.
+		// Undo core's listener, which applied the saved entry to an ancestor logger.
 		context().reconfigure();
 		context().getConfiguration().addLogger("org.openmrs.module.rhdflags",
 		    new LoggerConfig("org.openmrs.module.rhdflags", Level.WARN, true));

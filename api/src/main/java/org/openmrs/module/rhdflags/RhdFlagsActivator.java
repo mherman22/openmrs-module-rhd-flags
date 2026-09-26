@@ -61,9 +61,8 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 	}
 	
 	/**
-	 * Gives this module its own logger, at log.level's entry for it or inheriting when there is none.
-	 * Core resolves a saved entry to the nearest configured logger, which would otherwise be
-	 * org.openmrs.
+	 * Gives this module its own logger, so core resolves a saved log.level entry for it here rather
+	 * than to the nearest configured ancestor, org.openmrs.
 	 */
 	private void applyConfiguredLogLevel() {
 		try {
