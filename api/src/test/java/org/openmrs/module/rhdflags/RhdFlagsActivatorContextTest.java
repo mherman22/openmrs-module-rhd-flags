@@ -10,6 +10,7 @@
 package org.openmrs.module.rhdflags;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -21,6 +22,9 @@ import org.junit.Test;
 import org.openmrs.GlobalProperty;
 import org.openmrs.api.context.Context;
 import org.openmrs.test.BaseModuleContextSensitiveTest;
+import org.openmrs.module.rhdflags.task.PatientFlagRefreshTask;
+import org.openmrs.scheduler.SchedulerService;
+import org.openmrs.scheduler.TaskDefinition;
 import org.openmrs.util.OpenmrsConstants;
 import org.openmrs.util.OpenmrsUtil;
 
@@ -84,6 +88,36 @@ public class RhdFlagsActivatorContextTest extends BaseModuleContextSensitiveTest
 		new RhdFlagsActivator().started();
 		
 		assertEquals(Level.WARN, LogManager.getLogger(MODULE_LOGGER).getLevel());
+	}
+	
+	@Test
+	public void anEntryForAnotherPackageLeavesTheModuleFollowingOpenmrs() {
+		Context.getAdministrationService()
+		        .saveGlobalProperty(new GlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_LOG_LEVEL, "org.openmrs.api:info"));
+		context().reconfigure();
+		
+		new RhdFlagsActivator().started();
+		OpenmrsUtil.applyLogLevel("org.openmrs", "debug");
+		
+		assertEquals(Level.DEBUG, LogManager.getLogger(MODULE_LOGGER).getLevel());
+	}
+	
+	@Test
+	public void updatesTheDescriptionOfATaskAnEarlierVersionRegistered() {
+		SchedulerService schedulerService = Context.getSchedulerService();
+		TaskDefinition task = new TaskDefinition();
+		task.setName(RhdFlagsActivator.REFRESH_TASK_NAME);
+		task.setDescription("an older description");
+		task.setTaskClass(PatientFlagRefreshTask.class.getName());
+		task.setRepeatInterval(86400L);
+		task.setStartOnStartup(Boolean.TRUE);
+		task.setStarted(Boolean.FALSE);
+		schedulerService.saveTaskDefinition(task);
+		
+		new RhdFlagsActivator().started();
+		
+		String description = schedulerService.getTaskByName(RhdFlagsActivator.REFRESH_TASK_NAME).getDescription();
+		assertTrue(description, description.startsWith("Re-evaluates every enabled, unretired patient flag"));
 	}
 	
 	private LoggerContext context() {

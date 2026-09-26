@@ -100,8 +100,13 @@ public class RhdFlagsActivator extends BaseModuleActivator {
 	private void schedule(String name, String taskClass, String description) {
 		try {
 			SchedulerService schedulerService = Context.getSchedulerService();
-			if (schedulerService.getTaskByName(name) != null) {
-				log.debug("'{}' is already registered", name);
+			TaskDefinition existing = schedulerService.getTaskByName(name);
+			if (existing != null) {
+				// Only the description: the interval and start time are the administrator's to change.
+				if (!description.equals(existing.getDescription())) {
+					existing.setDescription(description);
+					schedulerService.saveTaskDefinition(existing);
+				}
 				return;
 			}
 			

@@ -112,11 +112,11 @@ lists failed, and logs the cause of each at `error`. The platform's packaged `lo
 `org.openmrs` at `warn`, so those are the lines you get without configuring anything.
 
 For the rest, including which list changed and by how much, add `org.openmrs.module.rhdflags:info`
-to `log.level` under **Administration > Settings > Log**, then restart. The module gives itself its
-own logger at startup, so the entry reaches only this module until core next reloads its logging
-configuration, which saving `log.layout` or `log.location` does; restart after changing either. On
-platform 2.4.0 to 2.4.3 and 2.5.0, core applies the entry to `org.openmrs` as a whole, which the
-module cannot prevent.
+to `log.level` under **Administration > Settings > Log**, then restart. Saving that page reloads
+core's logging configuration, so until the restart the entry applies to `org.openmrs` as a whole.
+After it, the module gives itself its own logger at startup and the entry reaches only this module.
+On platform 2.4.0 to 2.4.3 and 2.5.0, core applies the entry to `org.openmrs` even after a restart,
+which the module cannot prevent.
 
 ## Building
 
